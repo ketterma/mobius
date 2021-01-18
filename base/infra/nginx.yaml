@@ -26,3 +26,12 @@ spec:
         kind: HelmRepository
         name: ingress-nginx
   interval: 10m0s
+  values:
+    controller:
+      nodeSelector:
+        kubernetes.io/hostname: tails
+      service:
+        type: NodePort
+        nodePorts:
+          http: 32080
+          https: 32443
