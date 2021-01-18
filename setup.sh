@@ -6,7 +6,7 @@ flux bootstrap github \
   --owner=ketterma \
   --repository=mobius \
   --branch=main \
-  --path=./base \
+  --path=./flux \
   --personal
 
 flux create source git mobius \
