@@ -1,0 +1,8 @@
+*.db*
+*.log*
+custom_components/
+nest/event_media
+www/custom_cards/icloud3-event-log-card.js
+.storage
+secrets.yaml
+esphome/secrets.yaml

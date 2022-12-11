@@ -1,0 +1,33 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+# Text to speech
+tts:
+  - platform: google_translate
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# Wemo integration with manual IP configuration
+wemo:
+  static:
+    - 192.168.32.116
+
+# Timer helper for security lighting timeout
+timer:
+  security_lights_timer:
+    duration: "00:05:00"
+    name: "Security Lights Timer"
+    icon: mdi:timer-outline
+    
