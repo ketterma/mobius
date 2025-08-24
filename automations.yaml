@@ -1,10 +1,10 @@
 - id: '1755668156778'
   alias: Driveway - Smooth Sunset Fade
-  description: 'Gradually fade in driveway lights starting 15 minutes before sunset'
+  description: Gradually fade in driveway lights starting 15 minutes before sunset
   triggers:
   - trigger: sun
     event: sunset
-    offset: '-00:15:00'
+    offset: -00:15:00
   actions:
   - service: light.turn_on
     target:
@@ -13,14 +13,13 @@
       brightness_pct: 50
       transition: 900
   mode: single
-
 - id: '1755668333675'
   alias: Driveway - Smooth Sunrise Fade Out
-  description: 'Gradually fade out driveway lights starting 15 minutes after sunrise'
+  description: Gradually fade out driveway lights starting 15 minutes after sunrise
   triggers:
   - trigger: sun
     event: sunrise
-    offset: '00:15:00'
+    offset: 00:15:00
   actions:
   - service: light.turn_off
     target:
@@ -28,22 +27,21 @@
     data:
       transition: 900
   mode: single
-
-
-- id: 'security_lights_activate'
-  alias: 'Security Lights - Person/Vehicle Detected'
-  description: 'Activate security lighting when person or vehicle detected during night hours'
+- id: security_lights_activate
+  alias: Security Lights - Person/Vehicle Detected
+  description: Activate security lighting when person or vehicle detected during night
+    hours
   triggers:
   - trigger: state
-    entity_id: 
-      - binary_sensor.driveway_af_person_detected
-      - binary_sensor.driveway_af_vehicle_detected
-      - binary_sensor.driveway_cdv_person_detected  
-      - binary_sensor.driveway_cdv_vehicle_detected
-      - binary_sensor.g4_pro_person_detected
-      - binary_sensor.g4_pro_vehicle_detected  
-      - binary_sensor.g4_doorbell_person_detected
-      - binary_sensor.g4_doorbell_vehicle_detected
+    entity_id:
+    - binary_sensor.driveway_af_person_detected
+    - binary_sensor.driveway_af_vehicle_detected
+    - binary_sensor.driveway_cdv_person_detected
+    - binary_sensor.driveway_cdv_vehicle_detected
+    - binary_sensor.g4_pro_person_detected
+    - binary_sensor.g4_pro_vehicle_detected
+    - binary_sensor.g4_doorbell_person_detected
+    - binary_sensor.g4_doorbell_vehicle_detected
     to: 'on'
   conditions:
   - condition: sun
@@ -54,17 +52,17 @@
     - conditions:
       - condition: state
         entity_id: timer.security_lights_timer
-        state: 'idle'
+        state: idle
       sequence:
       - service: scene.create
         data:
           scene_id: security_lights_restore
           snapshot_entities:
-            - light.driveway
-            - light.front_porch_1
-            - light.front_porch_2
-            - light.front_porch_3
-            - light.back_door_lantern
+          - light.driveway
+          - light.front_porch_1
+          - light.front_porch_2
+          - light.front_porch_3
+          - light.back_door_lantern
       - service: light.turn_on
         target:
           entity_id: light.driveway
@@ -73,11 +71,11 @@
           transition: 5
       - service: light.turn_on
         target:
-          entity_id: 
-            - light.front_porch_1
-            - light.front_porch_2  
-            - light.front_porch_3
-            - light.back_door_lantern
+          entity_id:
+          - light.front_porch_1
+          - light.front_porch_2
+          - light.front_porch_3
+          - light.back_door_lantern
         data:
           brightness_pct: 100
           transition: 5
@@ -85,10 +83,9 @@
     target:
       entity_id: timer.security_lights_timer
   mode: restart
-
-- id: 'security_lights_reset'
-  alias: 'Security Lights - Reset After Timer'  
-  description: 'Restore lights to original state after 5 minutes of no activity'
+- id: security_lights_reset
+  alias: Security Lights - Reset After Timer
+  description: Restore lights to original state after 5 minutes of no activity
   triggers:
   - trigger: event
     event_type: timer.finished
@@ -104,4 +101,20 @@
     target:
       entity_id: scene.security_lights_restore
   mode: single
-
+- id: '1756056166666'
+  alias: Camera Vision
+  description: ''
+  use_blueprint:
+    path: valentinfrlch/event_summary.yaml
+    input:
+      camera_entities:
+      - camera.g4_pro_high_2
+      - camera.g3_bullet_high
+      - camera.g4_pro_high_3
+      - camera.g4_pro_high
+      provider: 01K3EH5S6PF16B7X3ZRWVMW0FJ
+      notify_device:
+      - 83960fe87fb8b1c1bb5ab0a4de1b8011
+      preview_mode: Live Preview
+      notification_time: ''
+      model: gemini-2.5-flash

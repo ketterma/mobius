@@ -1,10 +1,31 @@
+# Logs
 *.db*
 *.log*
+
+# Tracked by HACS
 custom_components/
-nest/event_media
-www/custom_cards/icloud3-event-log-card.js
+www/community/
 .storage
+
+# Secrets
 secrets.yaml
 esphome/secrets.yaml
+*august.conf*
 .ssh/*
 !.ssh/config
+
+# Media Content
+image/
+tts/
+nest/event_media
+
+# Claude
+.claude/*local*
+.claude/.credentials.json
+.claude/.anthropic/
+.claude/shell-snapshots/
+.claude/statsig/
+.claude/todos/
+.claude/plugins/
+.claude/downloads/
+.claude/ide/
