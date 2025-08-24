@@ -1,0 +1,33 @@
+version: 2
+updates:
+  # Monitor GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Group all GitHub Actions updates into a single PR
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    # Auto-approve patch and minor updates for trusted actions
+    auto-merge:
+      enabled: false
+    # Add reviewers (optional)
+    reviewers:
+      - "ketterma"
+    # Add labels to PRs
+    labels:
+      - "dependencies"
+      - "github-actions"
+    # Limit number of open PRs
+    open-pull-requests-limit: 5
+    # Allow dependabot to update GitHub Actions to latest versions
+    allow:
+      - dependency-type: "all"
+    # Commit message prefix
+    commit-message:
+      prefix: "deps"
+      include: "scope"
