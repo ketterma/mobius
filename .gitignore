@@ -11,7 +11,6 @@ www/community/
 secrets.yaml
 esphome/secrets.yaml
 *august.conf*
-.ssh/*
 !.ssh/config
 
 # Media Content
@@ -21,11 +20,6 @@ nest/event_media
 
 # Claude
 .claude/*local*
-.claude/.credentials.json
-.claude/.anthropic/
-.claude/shell-snapshots/
-.claude/statsig/
-.claude/todos/
-.claude/plugins/
-.claude/downloads/
-.claude/ide/
+.config/**
+!.config/ssh/config
+!.config/ssh/known_hosts

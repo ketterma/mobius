@@ -1,0 +1,9 @@
+{
+    "explorer.excludeGitIgnore": false,
+    "files.exclude": {
+        // ".config": true,
+        "tts": true,
+        "image": true,
+        "nest": true,
+    }
+}
