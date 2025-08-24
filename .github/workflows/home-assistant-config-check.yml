@@ -1,0 +1,50 @@
+name: Home Assistant Configuration Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  home-assistant-config:
+    name: Home Assistant Config Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Home Assistant config check
+        uses: frenck/action-home-assistant@v1
+        with:
+          path: "."
+
+  esphome-config:
+    name: ESPHome Config Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Create secrets file for validation
+        run: cp esphome/secrets.yaml.example esphome/secrets.yaml
+
+      - name: Validate ESPHome configs
+        run: |
+          cd esphome
+          for config in *.yaml; do
+            # Skip the secrets and example files
+            if [[ "$config" == "secrets.yaml" || "$config" == "secrets.yaml.example" ]]; then
+              continue
+            fi
+            echo "Validating $config..."
+            esphome config "$config"
+          done
