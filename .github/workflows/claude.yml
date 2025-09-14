@@ -24,6 +24,8 @@ jobs:
       issues: read
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
+    env:
+      HA_TOKEN: ${{ secrets.HA_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,8 +47,4 @@ jobs:
 
           # Add MCP configuration for Home Assistant
           claude_args: '--mcp-config .github/mcp-config.json'
-
-          # Environment variables for MCP servers
-          env:
-            HA_TOKEN: ${{ secrets.HA_TOKEN }}
 
