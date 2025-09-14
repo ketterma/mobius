@@ -60,6 +60,10 @@ jobs:
           #   Use TypeScript for new files
           
           # Optional: Custom environment variables for Claude
-          claude_env: |
-            HA_TOKEN: ${{ secrets.HA_TOKEN }}
+          settings: |
+            {
+              "env": {
+                "HA_TOKEN": "${{ secrets.HA_TOKEN }}"
+              }
+            }
 
