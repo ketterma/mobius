@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "hass-mcp": {
+      "command": "uvx",
+      "args": ["hass-mcp"],
+      "env": {
+        "HA_URL": "https://ha.jaxonk.com",
+        "HA_TOKEN": "${HA_TOKEN}"
+      }
+    }
+  }
+}
