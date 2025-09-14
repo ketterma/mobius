@@ -35,7 +35,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--mcp-config .github/mcp-config.json"
+          claude_args: |
+            --mcp-config '{"mcpServers": {"hass-mcp": {"command": "uvx", "args": ["hass-mcp"], "env": {"HA_URL": "https://ha.jaxonk.com", "HA_TOKEN": "${{ secrets.HA_TOKEN }}"}}}}'"
 
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
