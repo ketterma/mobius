@@ -1,5 +1,5 @@
 blueprint:
-  name: AI Event Summary (v1.5.0)
+  name: AI Event Summary (v1.5.1)
   author: valentinfrlch
   homeassistant:
     min_version: 2024.10.0
@@ -9,7 +9,7 @@ blueprint:
 
     '
   domain: automation
-  source_url: https://raw.githubusercontent.com/valentinfrlch/ha-llmvision/refs/heads/main/blueprints/event_summary.yaml
+  source_url: https://github.com/valentinfrlch/ha-llmvision/blob/main/blueprints/event_summary.yaml
   input:
     run_conditions:
       name: Run Conditions
@@ -180,25 +180,24 @@ blueprint:
         notification_delivery:
           name: Notification Delivery
           description: "Controls how notifications are delivered. \n \n **Dynamic**
-            immediately notifies with a live preview and updates the notification
-            silently with a summary once it is available. \n **Consolidated** Delays
-            the notification until the event summary is generated. Use this if you're
-            receiving multiple notifications for the same event."
+            immediately notifies with a Live Preview (iOS only) or Snapshot before
+            analysis and updates the notification silently with a summary once it
+            is available, or after analysis. \n **Consolidated** Delays the notification
+            until the event summary is generated. Use this if you're receiving multiple
+            notifications for the same event."
           default: Dynamic
           selector:
             select:
               options:
               - Dynamic
               - Consolidated
-              custom_value: false
               multiple: false
+              custom_value: false
               sort: false
         preview_mode:
           name: Preview Mode
-          description: "Choose between a live preview or a snapshot of the event.
-            The Snapshot of the last camera, if using multiple Camera Entities, will
-            be used but the notification will be udated with the camera view that
-            triggered the automation. \n\n **Important:** Live Preview is only supported
+          description: "Choose between a live preview or a snapshot of the event before
+            analysis.\n> [!IMPORTANT]  \n> **IMPORTANT**: Live Preview is only supported
             on iOS."
           default: Snapshot
           selector:
@@ -206,8 +205,22 @@ blueprint:
               options:
               - Snapshot
               - Live Preview
-              custom_value: false
               multiple: false
+              custom_value: false
+              sort: false
+        analysis_mode:
+          name: Analysis Mode
+          description: "Choose between a live preview or a snapshot of the event after
+            analysis.\n> [!IMPORTANT]  \n> **IMPORTANT**: Live Preview is only supported
+            on iOS."
+          default: Snapshot
+          selector:
+            select:
+              options:
+              - Snapshot
+              - Live Preview
+              multiple: false
+              custom_value: false
               sort: false
         notification_time:
           name: Notification Time
@@ -220,11 +233,11 @@ blueprint:
               - label: No Time Added
                 value: ''
               - label: 12 Hour
-                value: at {{ now().strftime("%I:%M %p") }}
+                value: at {{ now().strftime("%-I:%M %p") }}
               - label: 24 Hour
                 value: at {{ now().strftime("%H:%M") }}
-              custom_value: false
               multiple: false
+              custom_value: false
               sort: false
         file_path:
           name: File Path - To send snapshot in Dynamic Mode with Snapshot Preview
@@ -369,9 +382,9 @@ blueprint:
           selector:
             boolean: {}
         tts_volume:
-          name: TTS Volume
-          description: Set TTS volume to device's current alarm volume or Max volume.
-            ALARM VOLUME WILL IGNORE DO NOT DISTURB! Android Only
+          name: TTS Volume (Android Only)
+          description: "Set TTS volume to device's current alarm volume or Max volume.
+            \n> [!NOTE]  \n> ALARM VOLUME WILL IGNORE DO NOT DISTURB!"
           default: notification_stream
           selector:
             select:
@@ -382,8 +395,8 @@ blueprint:
                 value: alarm_stream
               - label: Max Alarm Volume/Sound
                 value: alarm_stream_max
-              custom_value: false
               multiple: false
+              custom_value: false
               sort: false
         condition_notify_tts:
           name: Condition to TTS Notify
@@ -459,6 +472,7 @@ variables:
   remember: !input remember
   cooldown: !input cooldown
   preview_mode: !input preview_mode
+  analysis_mode: !input analysis_mode
   notify_devices: !input notify_device
   notification_delivery: !input notification_delivery
   notification_sticky: !input notification_sticky
@@ -489,6 +503,10 @@ variables:
 
     '
   label: Motion detected
+  camera_message: '{{ camera_entity.replace("camera.", "").replace("_", " ")|capitalize
+    }}
+
+    '
   camera: '{{ camera_entities_list[0].replace("camera.", "").replace("_", " ") | title
     }}
 
@@ -580,7 +598,7 @@ action:
                   - action: notify.{{ repeat.item }}
                     data:
                       title: '{{ label }} {{ notification_time }}'
-                      message: '{{camera}} has detected activity.'
+                      message: '{{camera_message}} has detected activity.'
                       data:
                         url: !input tap_navigate
                         clickAction: !input tap_navigate
@@ -615,7 +633,7 @@ action:
                   - action: notify.{{ repeat.item }}
                     data:
                       title: '{{ label }} {{ notification_time }}'
-                      message: '{{camera}} has detected activity.'
+                      message: '{{camera_message}} has detected activity.'
                       data:
                         entity_id: '{{camera_entity}}'
                         url: !input tap_navigate
@@ -663,35 +681,77 @@ action:
         value_template: '{{ not this.attributes.last_triggered or (now() - this.attributes.last_triggered).seconds
           > delay_notification }}'
       then:
-      - alias: (Snapshot) Update notification on notify devices
-        repeat:
-          for_each: '{{device_name_map}}'
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ analysis_mode==''Snapshot'' }}'
           sequence:
-          - action: notify.{{ repeat.item }}
-            data:
-              title: '{{ label }} {{ notification_time }}'
-              message: '{{response.response_text}}'
-              data:
-                image: '{{response.key_frame.replace(''/config/www/'',''/local/'')
-                  }}'
-                url: !input tap_navigate
-                clickAction: !input tap_navigate
-                tag: '{{tag}}'
-                group: !input notification_channel
-                alert_once: true
-                ttl: 0
-                priority: high
-                channel: !input notification_channel
-                color: !input notification_color
-                notification_icon: !input notification_icon
-                sticky: !input notification_sticky
-                push:
-                  interruption-level: '{{''passive'' if notification_delivery==''Dynamic''
-                    else ''active''}}'
-                  sound:
-                    name: !input notification_sound
-                    volume: !input notification_volume
-                    critical: '{{ notification_critical }}'
+          - alias: (Snapshot) Update notification on notify devices
+            repeat:
+              for_each: '{{device_name_map}}'
+              sequence:
+              - action: notify.{{ repeat.item }}
+                data:
+                  title: '{{ label }} {{ notification_time }}'
+                  message: '{{response.response_text}}'
+                  data:
+                    image: '{{response.key_frame.replace(''/config/media'', ''/media'')
+                      }}'
+                    url: !input tap_navigate
+                    clickAction: !input tap_navigate
+                    tag: '{{tag}}'
+                    group: !input notification_channel
+                    alert_once: true
+                    ttl: 0
+                    priority: high
+                    channel: !input notification_channel
+                    color: !input notification_color
+                    notification_icon: !input notification_icon
+                    sticky: !input notification_sticky
+                    push:
+                      interruption-level: '{{''passive'' if notification_delivery==''Dynamic''
+                        else ''active''}}'
+                      sound:
+                        name: !input notification_sound
+                        volume: !input notification_volume
+                        critical: '{{ notification_critical }}'
+                    actions:
+                    - action: URI
+                      title: See Snapshot
+                      uri: '{{response.key_frame.replace(''/config/media'', ''/media'')
+                        }}'
+        - conditions:
+          - condition: template
+            value_template: '{{ analysis_mode==''Live Preview'' }}'
+          sequence:
+          - alias: Send Live Feed to notify devices
+            repeat:
+              for_each: '{{device_name_map}}'
+              sequence:
+              - action: notify.{{ repeat.item }}
+                data:
+                  title: '{{ label }} {{ notification_time }}'
+                  message: '{{ response.response_text }}'
+                  data:
+                    entity_id: '{{camera_entity}}'
+                    url: !input tap_navigate
+                    tag: '{{tag}}'
+                    group: !input notification_channel
+                    alert_once: true
+                    push:
+                      interruption-level: '{{importance.response_text|lower if importance
+                        is defined else ''active''}}'
+                      sound:
+                        name: !input notification_sound
+                        volume: !input notification_volume
+                        critical: '{{ notification_critical }}'
+                    ttl: 0
+                    priority: high
+                    actions:
+                    - action: URI
+                      title: See Snapshot
+                      uri: '{{response.key_frame.replace(''/config/media'', ''/media'')
+                        }}'
     - if:
       - condition: template
         value_template: '{{ tts_notification }}'

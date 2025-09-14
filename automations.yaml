@@ -112,9 +112,47 @@
       - camera.g3_bullet_high
       - camera.g4_pro_high_3
       - camera.g4_pro_high
+      - camera.g4_doorbell_high
       provider: 01K3EH5S6PF16B7X3ZRWVMW0FJ
       notify_device:
       - 83960fe87fb8b1c1bb5ab0a4de1b8011
       preview_mode: Live Preview
       notification_time: ''
       model: gemini-2.5-flash
+      motion_sensors:
+      - binary_sensor.driveway_af_animal_detected
+      - binary_sensor.driveway_af_person_detected
+      - binary_sensor.driveway_af_vehicle_detected
+      - binary_sensor.driveway_backdoor_animal_detected
+      - binary_sensor.driveway_cdv_animal_detected
+      - binary_sensor.front_door_animal_detected
+      - binary_sensor.g4_pro_person_detected
+      - binary_sensor.driveway_cdv_person_detected
+      - binary_sensor.g4_doorbell_person_detected
+      - binary_sensor.g4_pro_vehicle_detected
+      - binary_sensor.driveway_cdv_vehicle_detected
+      - binary_sensor.g4_doorbell_vehicle_detected
+      - binary_sensor.g4_doorbell_motion
+      - binary_sensor.g4_doorbell_package_detected
+      - binary_sensor.g4_doorbell_doorbell
+      cooldown:
+        hours: 0
+        minutes: 2
+        seconds: 0
+      use_memory: false
+      analysis_mode: Live Preview
+      trigger_state: recording
+- id: '1756582270409'
+  alias: Home Assistant GitHub Pipeline
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.ketterma_homeassistant_latest_commit
+  conditions: []
+  actions:
+  - action: hassio.addon_start
+    metadata: {}
+    data:
+      addon: core_git_pull
+  mode: single

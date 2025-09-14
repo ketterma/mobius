@@ -2,6 +2,10 @@
 # Loads default set of integrations. Do not remove.
 default_config:
 
+homeassistant:
+  media_dirs:
+    llmvision: /config/media/llmvision
+
 http:
   use_x_forwarded_for: true
   trusted_proxies:

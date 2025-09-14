@@ -17,6 +17,7 @@ esphome/secrets.yaml
 image/
 tts/
 nest/event_media
+media/llmvision
 
 # Claude
 .claude/*local*

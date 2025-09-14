@@ -1,0 +1,45 @@
+esphome:
+  name: panel
+  friendly_name: Panel
+
+esp32:
+  variant: esp32p4
+  flash_size: 32MB
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret panel_api_key
+
+# ---- Ethernet (RMII + IP101) ----
+# ethernet:
+#   type: IP101
+#   phy_addr: 1
+#   mdc_pin: GPIO47
+#   mdio_pin: GPIO48
+#   power_pin: GPIO52
+#   clk_mode: GPIO0_IN
+
+# ESP32-C6 co-processor over SDIO
+esp32_hosted:
+  variant: ESP32C6
+  # SDIO lines between P4 and C6 (same pins as the TF/SD slot on this board)
+  clk_pin: GPIO43
+  cmd_pin: GPIO44
+  d0_pin: GPIO39
+  d1_pin: GPIO40
+  d2_pin: GPIO41
+  d3_pin: GPIO42
+  # Reset line to the C6 (active high). Try GPIO18 first; if it doesn't probe, try GPIO19.
+  reset_pin: GPIO18
+  active_high: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
