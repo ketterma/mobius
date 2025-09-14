@@ -32,6 +32,23 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Create MCP Config
+        run: |
+          cat > /tmp/mcp-config.json << 'EOF'
+          {
+            "mcpServers": {
+              "hass-mcp": {
+                "command": "uvx",
+                "args": ["hass-mcp"],
+                "env": {
+                  "HA_URL": "https://ha.jaxonk.com",
+                  "HA_TOKEN": "${{ secrets.HA_TOKEN }}"
+                }
+              }
+            }
+          }
+          EOF
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -46,5 +63,5 @@ jobs:
           # prompt: 'Update the pull request description to include a summary of changes.'
 
           # Add MCP configuration for Home Assistant
-          claude_args: '--mcp-config .github/mcp-config.json'
+          claude_args: '--mcp-config /tmp/mcp-config.json'
 
