@@ -35,7 +35,7 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--mcp-config .github/mcp-config.json"
+          mcp_config: ".github/mcp-config.json"
 
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
