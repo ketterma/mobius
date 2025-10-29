@@ -55,11 +55,14 @@ spec:
           - -c
           - |
             touch /data/acme.json
-            chmod 600 /data/acme.json
             chown 65532:65532 /data/acme.json
+            chmod 600 /data/acme.json
+            ls -la /data/acme.json
         volumeMounts:
           - name: data
             mountPath: /data
+        securityContext:
+          runAsUser: 0
 
     # Let's Encrypt configuration with DNS-01 challenge
     additionalArguments:
