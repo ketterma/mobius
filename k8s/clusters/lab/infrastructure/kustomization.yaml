@@ -4,4 +4,5 @@ kind: Kustomization
 resources:
   - storage-classes.yaml
   - metallb.yaml
+  - metallb-config.yaml
   - traefik.yaml
