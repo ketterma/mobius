@@ -29,22 +29,5 @@ spec:
     remediation:
       retries: 3
   values:
-    # MetalLB values
----
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
-metadata:
-  name: homelab-pool
-  namespace: metallb-system
-spec:
-  addresses:
-  - 192.168.8.50-192.168.8.79
----
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
-metadata:
-  name: homelab-l2
-  namespace: metallb-system
-spec:
-  ipAddressPools:
-  - homelab-pool
+    # MetalLB values - resources created post-install via postRenderers not supported
+    # Will create IPAddressPool separately after chart installs
