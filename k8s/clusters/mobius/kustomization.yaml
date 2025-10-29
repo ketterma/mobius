@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - flux-system/
-  - infrastructure.yaml
+  - infrastructure-storage.yaml
   - cloud-cluster.yaml
   - homelab-cluster.yaml
   - sandbox-cluster.yaml

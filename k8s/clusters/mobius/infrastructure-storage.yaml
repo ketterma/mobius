@@ -1,0 +1,40 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure-storage
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./k8s/infrastructure/storage/n5
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  patches:
+    - target:
+        kind: StorageClass
+        name: openebs-zfs-ai
+      patch: |-
+        - op: replace
+          path: /parameters/poolname
+          value: "ai/mobius"
+
+    - target:
+        kind: StorageClass
+        name: openebs-zfs-vms
+      patch: |-
+        - op: replace
+          path: /parameters/poolname
+          value: "vms/mobius"
+        - op: add
+          path: /metadata/annotations
+          value:
+            storageclass.kubernetes.io/is-default-class: "true"
+
+    - target:
+        kind: StorageClass
+        name: openebs-zfs-tank
+      patch: |-
+        - op: replace
+          path: /parameters/poolname
+          value: "tank/mobius"
