@@ -29,5 +29,36 @@ spec:
     remediation:
       retries: 3
   values:
+    # Service configuration
     service:
       type: LoadBalancer
+      annotations:
+        metallb.universe.tf/loadBalancerIPs: 192.168.8.50
+
+    # Persistent storage for Let's Encrypt certificates
+    persistence:
+      enabled: true
+      storageClass: openebs-zfs-homelab
+      size: 1Gi
+      path: /data
+
+    # Let's Encrypt configuration with DNS-01 challenge
+    additionalArguments:
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@jax-lab.dev"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
+
+    # Environment variables for Cloudflare API token
+    env:
+      - name: CF_DNS_API_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: cloudflare-api-token
+            key: CF_DNS_API_TOKEN
+
+    # Enable IngressRoute CRD
+    ingressRoute:
+      dashboard:
+        enabled: false

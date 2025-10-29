@@ -5,3 +5,4 @@ resources:
   - storage-classes.yaml
   - metallb.yaml
   - traefik.yaml
+  - traefik-cloudflare.secret.yaml

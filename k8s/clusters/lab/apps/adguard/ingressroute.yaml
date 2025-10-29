@@ -1,0 +1,17 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: adguard-home
+  namespace: adguard-home
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`dns.jax-lab.dev`)
+      kind: Rule
+      services:
+        - name: adguard-home-web
+          port: 80
+  tls:
+    certResolver: letsencrypt
