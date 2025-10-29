@@ -5,22 +5,3 @@ metadata:
   namespace: k0smotron
 spec:
   replicas: 1
-  k0s:
-    version: v1.34.1+k0s.0
-  k0sConfig:
-    apiVersion: k0s.k0sproject.io/v1beta1
-    kind: ClusterConfig
-    metadata:
-      name: homelab-cluster
-    spec:
-      api:
-        address: 192.168.8.8
-        sans:
-          - 192.168.8.8
-          - 192.168.8.9  # Secondary IP for k8s Traefik during migration
-          - homelab-cluster
-          - homelab-cluster.homelab-cluster.svc
-      networking:
-        provider: kube-router
-        podCIDR: 10.242.0.0/16
-        serviceCIDR: 10.243.0.0/16
