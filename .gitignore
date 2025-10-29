@@ -1,0 +1,5 @@
+
+# SOPS age keys - NEVER commit!
+age.agekey
+*.agekey
+.sops/

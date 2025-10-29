@@ -7,3 +7,5 @@ resources:
   - cloud-cluster.yaml
   - homelab-cluster.yaml
   - sandbox-cluster.yaml
+  - homelab-workers.yaml
+  - secrets/worker-ssh-key.yaml

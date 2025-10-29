@@ -115,11 +115,31 @@ Flux will manage the k0smotron Cluster CRDs that define the workload clusters:
 flux bootstrap github \
   --owner=your-user \
   --repository=homelab \
-  --path=k8s/clusters/management \
+  --path=k8s/clusters/mobius \
   --personal
 ```
 
-### 4. Deploy Workload Clusters
+### 4. Bootstrap SOPS for Secret Management
+
+After Flux is running, create the SOPS decryption secret so Flux can decrypt secrets in the repository:
+
+```bash
+# Create sops-age Secret using your SSH private key
+# This is a one-time manual bootstrap step (not managed by GitOps)
+kubectl create secret generic sops-age \
+  --namespace=flux-system \
+  --from-file=age.agekey=~/.ssh/id_ed25519
+
+# Verify the secret was created
+kubectl get secret sops-age -n flux-system
+
+# NOTE: The repository .sops.yaml is configured to use your SSH public key:
+# ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMMWCN1efjHi2e7k13kCFPo4wKyH8zxPFL06CAKpSaNU
+```
+
+**Important:** This secret contains your SSH private key and is NOT stored in Git. It's a bootstrap artifact similar to kubeconfig files.
+
+### 5. Deploy Workload Clusters
 
 Flux will automatically create k0smotron Cluster CRDs:
 - **cloud-cluster**: VPS workload cluster (control plane on N5, worker on VPS)
@@ -132,7 +152,7 @@ kubectl get clusters -A
 kubectl logs -n k0smotron -l app.kubernetes.io/name=k0smotron -f
 ```
 
-### 5. Join Worker Nodes to Workload Clusters
+### 6. Join Worker Nodes to Workload Clusters
 
 For each workload cluster, retrieve the join token and add worker nodes:
 

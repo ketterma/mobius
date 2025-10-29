@@ -1,0 +1,28 @@
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: RemoteMachine
+metadata:
+  name: homelab-worker-n5
+  namespace: k0smotron
+spec:
+  address: 192.168.8.8
+  port: 22
+  user: jax
+  sshKeyRef:
+    name: worker-ssh-key
+    key: id_ed25519
+  pool: homelab-cluster
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: RemoteMachine
+metadata:
+  name: homelab-worker-m1
+  namespace: k0smotron
+spec:
+  address: 192.168.8.81
+  port: 22
+  user: jax
+  sshKeyRef:
+    name: worker-ssh-key
+    key: id_ed25519
+  pool: homelab-cluster

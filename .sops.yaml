@@ -1,0 +1,14 @@
+creation_rules:
+  # Encrypt all secrets in k8s/clusters/*/secrets/ directories
+  - path_regex: k8s/clusters/.*/secrets/.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMMWCN1efjHi2e7k13kCFPo4wKyH8zxPFL06CAKpSaNU
+
+  # Encrypt any file with .sops.yaml or .secret.yaml suffix
+  - path_regex: .*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMMWCN1efjHi2e7k13kCFPo4wKyH8zxPFL06CAKpSaNU
+
+  - path_regex: .*\.secret\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMMWCN1efjHi2e7k13kCFPo4wKyH8zxPFL06CAKpSaNU
