@@ -24,8 +24,8 @@ spec:
         name: traefik
         namespace: flux-system
   targetNamespace: traefik
-  createNamespace: true
   install:
+    createNamespaces: true
     remediation:
       retries: 3
   values:
