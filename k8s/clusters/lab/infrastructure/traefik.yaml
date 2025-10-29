@@ -43,27 +43,11 @@ spec:
       path: /data
 
     # Security context to allow writing to persistent volume
+    # fsGroupChangePolicy prevents Kubernetes from recursively chmod'ing files to 660
+    # This allows Traefik to create acme.json with correct 600 permissions
     podSecurityContext:
       fsGroup: 65532
-      fsGroupChangePolicy: "OnRootMismatch"  # Prevent recursive chmod that causes 660 permissions
-
-    # Init container to create acme.json with proper permissions
-    initContainers:
-      - name: volume-permissions
-        image: busybox:latest
-        command:
-          - sh
-          - -c
-          - |
-            touch /data/acme.json
-            chown 65532:65532 /data/acme.json
-            chmod 600 /data/acme.json
-            ls -la /data/acme.json
-        volumeMounts:
-          - name: data
-            mountPath: /data
-        securityContext:
-          runAsUser: 0
+      fsGroupChangePolicy: "OnRootMismatch"
 
     # Let's Encrypt configuration with DNS-01 challenge
     additionalArguments:
