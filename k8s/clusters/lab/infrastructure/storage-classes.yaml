@@ -1,0 +1,47 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: openebs-zfs-ai
+provisioner: zfs.csi.openebs.io
+allowVolumeExpansion: true
+parameters:
+  poolname: "ai/homelab"
+  fstype: "zfs"
+  compression: "lz4"
+  dedup: "off"
+  thinprovision: "yes"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: openebs-zfs-homelab
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: zfs.csi.openebs.io
+allowVolumeExpansion: true
+parameters:
+  poolname: "vms/homelab"
+  fstype: "zfs"
+  compression: "lz4"
+  dedup: "off"
+  thinprovision: "yes"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: openebs-zfs-tank
+provisioner: zfs.csi.openebs.io
+allowVolumeExpansion: true
+parameters:
+  poolname: "tank/homelab"
+  fstype: "zfs"
+  compression: "lz4"
+  dedup: "off"
+  thinprovision: "yes"
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
