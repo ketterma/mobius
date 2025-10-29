@@ -81,3 +81,8 @@ spec:
     ingressRoute:
       dashboard:
         enabled: false
+
+    # Allow ExternalName services for Home Assistant
+    providers:
+      kubernetesCRD:
+        allowExternalNameServices: true
