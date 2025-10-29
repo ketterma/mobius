@@ -35,4 +35,28 @@ kubectl get nodes
 kubectl get pods -A
 ```
 
+### Troubleshooting SSH Authentication
+
+If you get `ssh: unable to authenticate` errors:
+
+1. **Verify SSH key exists**:
+   ```bash
+   ls -la ~/.ssh/id_rsa
+   ```
+
+2. **Test SSH connection manually**:
+   ```bash
+   ssh -i ~/.ssh/id_rsa jax@192.168.8.8
+   ```
+
+3. **Check k0sctl logs**:
+   ```bash
+   cat ~/Library/Caches/k0sctl/k0sctl.log
+   ```
+
+4. **Verify N5 has your public key**:
+   ```bash
+   ssh jax@192.168.8.8 cat ~/.ssh/authorized_keys
+   ```
+
 Once all nodes are `Ready` and pods are running, proceed to Phase 1 in `k8s/README.md`.

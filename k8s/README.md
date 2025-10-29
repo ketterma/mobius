@@ -50,6 +50,7 @@ spec:
       ssh:
         address: 192.168.8.8
         user: jax
+        port: 22
         keyPath: ~/.ssh/id_rsa
   k0s:
     version: v1.34.1+k0s.0
@@ -61,7 +62,10 @@ spec:
       spec:
         api:
           address: 192.168.8.8
-        networking:
+          sans:
+            - 192.168.8.8
+            - k0smotron-management
+        network:
           provider: kube-router
 ```
 
