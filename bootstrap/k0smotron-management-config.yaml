@@ -9,7 +9,7 @@ spec:
         address: 192.168.8.8
         user: jax
         port: 22
-        keyPath: ~/.ssh/id_ed25519
+        keyPath: /Users/jax/.ssh/id_ed25519
   k0s:
     version: v1.34.1+k0s.0
     config:
