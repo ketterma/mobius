@@ -1,0 +1,25 @@
+apiVersion: k0smotron.io/v1beta1
+kind: Cluster
+metadata:
+  name: sandbox-cluster
+  namespace: k0smotron
+spec:
+  replicas: 1
+  k0s:
+    version: v1.34.1+k0s.0
+  k0sConfig:
+    apiVersion: k0s.k0sproject.io/v1beta1
+    kind: ClusterConfig
+    metadata:
+      name: sandbox-cluster
+    spec:
+      api:
+        address: 192.168.8.11
+        sans:
+          - 192.168.8.11
+          - sandbox-cluster
+          - sandbox-cluster.sandbox-cluster.svc
+      networking:
+        provider: kube-router
+        podCIDR: 10.244.0.0/16
+        serviceCIDR: 10.245.0.0/16
