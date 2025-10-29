@@ -18,45 +18,46 @@ This is the foundational step that must be completed before anything else.
 ### Deploy k0s Management Cluster
 
 ```bash
-cd bootstrap/
+# Deploy k0s cluster
+k0sctl apply --config bootstrap/k0sctl.yaml
 
-# Review the config
-cat k0smotron-management-config.yaml
+# Get kubeconfig and merge into default config
+cp ~/.kube/config ~/.kube/config.backup.$(date +%Y%m%d-%H%M%S)
+k0sctl kubeconfig --config bootstrap/k0sctl.yaml > ~/.kube/mobius-management.yaml
+KUBECONFIG=~/.kube/config:~/.kube/mobius-management.yaml kubectl config view --flatten > ~/.kube/config.merged
+mv ~/.kube/config.merged ~/.kube/config
 
-# Deploy
-k0sctl apply --config k0smotron-management-config.yaml
-
-# Get kubeconfig
-k0sctl kubeconfig > ~/.kube/mobius-management.yaml
-export KUBECONFIG=~/.kube/mobius-management.yaml
+# Switch to mobius context
+kubectl config use-context mobius
 
 # Verify cluster is ready
 kubectl get nodes
 kubectl get pods -A
 ```
 
-### Troubleshooting SSH Authentication
+**Note:** The k0sctl config includes `noTaints: true` for the controller+worker node, which automatically allows workloads to schedule on this single-node cluster.
 
-If you get `ssh: unable to authenticate` errors:
+### Install cert-manager
 
-1. **Verify SSH key exists**:
-   ```bash
-   ls -la ~/.ssh/id_rsa
-   ```
+k0smotron requires cert-manager for webhook certificates:
 
-2. **Test SSH connection manually**:
-   ```bash
-   ssh -i ~/.ssh/id_rsa jax@192.168.8.8
-   ```
+```bash
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.yaml
 
-3. **Check k0sctl logs**:
-   ```bash
-   cat ~/Library/Caches/k0sctl/k0sctl.log
-   ```
+# Wait for cert-manager to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=300s
+```
 
-4. **Verify N5 has your public key**:
-   ```bash
-   ssh jax@192.168.8.8 cat ~/.ssh/authorized_keys
-   ```
+### Install k0smotron
 
-Once all nodes are `Ready` and pods are running, proceed to Phase 1 in `k8s/README.md`.
+```bash
+kubectl apply --server-side=true -f https://docs.k0smotron.io/stable/install.yaml
+
+# Wait for k0smotron to be ready
+kubectl wait --for=condition=ready pod -l control-plane=controller-manager -n k0smotron --timeout=300s
+
+# Verify installation
+kubectl get pods -A
+```
+
+Once all pods are `Running`, proceed to Phase 1 (Flux bootstrap) in `k8s/README.md`.
