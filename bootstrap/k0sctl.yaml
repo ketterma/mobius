@@ -49,6 +49,60 @@ spec:
           type: etcd
         telemetry:
           enabled: false
+        extensions:
+          helm:
+            repositories:
+            - name: openebs
+              url: https://openebs.github.io/openebs
+            charts:
+            - name: openebs
+              chartname: openebs/openebs
+              version: "4.3.3"
+              namespace: openebs
+              order: 1
+              values: |
+                zfs-localpv:
+                  enabled: true
+                  zfsNode:
+                    kubeletDir: "/var/lib/k0s/kubelet/"
+
+                localpv-provisioner:
+                  enabled: false
+
+                engines:
+                  local:
+                    lvm:
+                      enabled: false
+                    zfs:
+                      enabled: true
+                  replicated:
+                    mayastor:
+                      enabled: false
+
+                storageClasses:
+                - name: openebs-zfs-vms
+                  provisioner: zfs.csi.openebs.io
+                  isDefaultClass: true
+                  reclaimPolicy: Delete
+                  allowVolumeExpansion: true
+                  parameters:
+                    poolname: "vms/mobius"
+                    fstype: "zfs"
+                    compression: "lz4"
+                    dedup: "off"
+                    thinprovision: "yes"
+
+                - name: openebs-zfs-tank
+                  provisioner: zfs.csi.openebs.io
+                  isDefaultClass: false
+                  reclaimPolicy: Retain
+                  allowVolumeExpansion: true
+                  parameters:
+                    poolname: "tank/mobius"
+                    fstype: "zfs"
+                    compression: "lz4"
+                    dedup: "off"
+                    thinprovision: "yes"
   options:
     wait:
       enabled: true
