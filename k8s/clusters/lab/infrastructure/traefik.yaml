@@ -45,6 +45,7 @@ spec:
     # Security context to allow writing to persistent volume
     podSecurityContext:
       fsGroup: 65532
+      fsGroupChangePolicy: "OnRootMismatch"  # Prevent recursive chmod that causes 660 permissions
 
     # Init container to create acme.json with proper permissions
     initContainers:
