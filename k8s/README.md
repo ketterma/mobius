@@ -25,6 +25,19 @@ First, create a standalone k0s cluster on N5 that will become the management clu
 
 **Option A: Using k0sctl (Recommended)**
 
+First, install k0sctl:
+
+```bash
+# macOS (Homebrew)
+brew install k0sproject/tap/k0sctl
+
+# Or with Go
+go install github.com/k0sproject/k0sctl@latest
+
+# Verify
+k0sctl version
+```
+
 Create `k0smotron-management-config.yaml`:
 ```yaml
 apiVersion: k0sctl.k0sproject.io/v1beta1
@@ -34,8 +47,7 @@ metadata:
 spec:
   hosts:
     - role: controller+worker
-      hostname: n5.jax-lab.dev
-      connection:
+      ssh:
         address: 192.168.8.8
         user: jax
         keyPath: ~/.ssh/id_rsa

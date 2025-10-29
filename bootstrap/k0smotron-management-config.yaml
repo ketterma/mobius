@@ -5,8 +5,7 @@ metadata:
 spec:
   hosts:
     - role: controller+worker
-      hostname: n5.jax-lab.dev
-      connection:
+      ssh:
         address: 192.168.8.8
         user: jax
         keyPath: ~/.ssh/id_rsa
