@@ -18,4 +18,4 @@ spec:
   - homelab-pool
   interfaces:
   - enp197s0  # 10G primary interface (N5 host)
-  - eno1      # 5G interface (bridge0 master, HA VM network)
+  - bridge0   # Bridge interface for HA VM network (eno1 + vnet1)
