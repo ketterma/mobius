@@ -8,8 +8,10 @@ spec:
   addresses:
   - 192.168.8.50-192.168.8.79
 ---
-# L2 Advertisement: Announce LoadBalancer IPs via ARP on bridge interface
+# L2 Advertisement: Announce LoadBalancer IPs via ARP on main interface
 # L2 mode is designed for same-subnet clients (VMs/containers on bridge0)
+# Must use enp197s0 (main interface) not eno1 (bridge slave with no IP)
+# enp197s0 at 192.168.8.8 can reach both direct network clients and VMs on bridge0
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
@@ -19,7 +21,7 @@ spec:
   ipAddressPools:
   - homelab-pool
   interfaces:
-  - eno1  # Only announce from bridge master interface (bridge0 parent)
+  - enp197s0  # Main interface - has IP and can respond to ARP
   nodeSelectors:
   - matchLabels:
       kubernetes.io/hostname: n5  # Only announce from N5 node
