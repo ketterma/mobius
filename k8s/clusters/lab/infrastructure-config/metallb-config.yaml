@@ -16,6 +16,8 @@ metadata:
 spec:
   ipAddressPools:
   - homelab-pool
+  interfaces:
+  - bridge0  # Only announce on bridge0 to allow VM traffic via vnet1
   nodeSelectors:
   - matchLabels:
       kubernetes.io/hostname: n5  # Only announce from N5 where bridge0 and HA VM are
