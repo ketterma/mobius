@@ -87,7 +87,3 @@ spec:
       create: true
       automount: true
       name: pocket-id
-
-    # Enterprise features (disabled)
-    enterprise:
-      enabled: false
