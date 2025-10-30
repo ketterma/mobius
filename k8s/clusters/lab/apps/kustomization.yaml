@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - homeassistant
   - adguard
+  - pocket-id

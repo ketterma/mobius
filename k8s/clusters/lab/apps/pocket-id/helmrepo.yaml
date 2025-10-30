@@ -1,0 +1,10 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: pocket-id
+  namespace: flux-system
+spec:
+  type: oci
+  url: oci://ghcr.io/hobbit44/pocket-id-helm
+  interval: 1h

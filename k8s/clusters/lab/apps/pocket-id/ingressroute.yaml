@@ -1,0 +1,23 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: pocket-id
+  namespace: pocket-id
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`auth.jax-lab.dev`)
+      kind: Rule
+      services:
+        - name: pocket-id
+          port: 80
+      middlewares:
+        - name: redirect-to-https
+          namespace: traefik
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: auth.jax-lab.dev
