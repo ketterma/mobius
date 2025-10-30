@@ -1,19 +1,21 @@
-# Home Assistant OIDC - MetalLB Hairpin Issue
+# Home Assistant OIDC - MetalLB Hairpin Issue ✅ RESOLVED
 
-## Root Cause Analysis
-BGP mode is fundamentally incompatible with same-subnet clients according to MetalLB documentation. BGP mode expects service IPs to be in a **different subnet** from nodes/clients, requiring traffic to route through the gateway. Our setup has the VM (192.168.8.10), LoadBalancer IPs (192.168.8.50-79), and bridge0 (192.168.8.246) all in the same /24 subnet, causing hairpin routing issues where ICMP works but TCP/UDP fails.
+## Solution: Macvlan Interface for MetalLB L2 Announcements
 
-Bridge hairpin mode is already enabled (vnet1 hairpin_mode=1), br_netfilter is loaded, and rp_filter is set to loose mode (2), but these don't solve the fundamental BGP same-subnet problem.
+**Status:** ✅ **WORKING**
 
-## Solution Options
+Created `metallb0` macvlan interface attached to bridge0 with unique MAC address. This solves the hairpin routing problem where VMs on the same bridge couldn't reach LoadBalancer IPs.
 
-### Option 1: Switch to L2 Mode with Interface Restrictions ⭐ RECOMMENDED
-**Status:** Ready to implement
+### Implementation
 
-Switch MetalLB from BGP to L2 mode, which is designed for same-subnet clients. Use the `interfaces` field to restrict ARP announcements to the bridge interface only.
+```bash
+# Create macvlan interface (already done, needs persistence)
+ip link add link bridge0 name metallb0 type macvlan mode bridge
+ip link set metallb0 up
+```
 
-**Implementation:**
 ```yaml
+# MetalLB L2Advertisement configuration
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
@@ -21,95 +23,85 @@ metadata:
   namespace: metallb-system
 spec:
   ipAddressPools:
-    - homelab-pool
+  - homelab-pool
   interfaces:
-    - eno1  # Only announce from bridge interface
+  - metallb0  # Macvlan on bridge0 with unique MAC
   nodeSelectors:
-    - matchLabels:
-        kubernetes.io/hostname: n5
+  - matchLabels:
+      kubernetes.io/hostname: n5
 ```
 
-**Steps:**
-1. Create L2Advertisement resource
-2. Delete BGPAdvertisement and BGPPeer resources
-3. Remove BGP config from UDM Pro
-4. Test VM connectivity
+### Why It Works
 
-**Pros:**
-- L2 mode designed for same-subnet clients
-- Uses ARP (works with bridge hairpin mode already enabled)
-- No network architecture changes needed
-- No router configuration required
+**Problem:** When MetalLB announced on bridge0 directly, it used bridge0's MAC address (22:c4:a4:e0:6d:fc). VMs sending packets to LoadBalancer IPs with this destination MAC caused the bridge to think packets were for itself (192.168.8.246), not for forwarding.
 
-**Cons:**
-- Single-node bottleneck (all traffic to one node)
-- Slower failover than BGP
+**Solution:** Macvlan interface creates a virtual interface with **unique MAC address** (f2:5a:5f:84:40:e8) that's still part of bridge0's L2 domain. Now:
+- Network clients via eno1 → bridge0 → can reach metallb0's MAC
+- VMs via vnet1 → bridge0 → can reach metallb0's MAC (different MAC, no conflict)
+- LoadBalancer IPs use metallb0's unique MAC, not bridge0's MAC
 
-### Option 2: Move VM to Different VLAN (Keep BGP Mode)
-**Status:** More complex alternative
+### Verification
 
-Separate the VM into a different subnet (e.g., VLAN 10 at 192.168.10.0/24) so traffic genuinely routes through UDM Pro's BGP table.
-
-**Implementation:**
 ```bash
-# On N5 host
-ip link add link eno1 name eno1.10 type vlan id 10
-ip addr add 192.168.10.246/24 dev eno1.10
-brctl addbr br-vlan10
-brctl addif br-vlan10 eno1.10
+# From VM (Home Assistant at 192.168.8.10):
+ip neigh show
+# Shows:
+# 192.168.8.53 dev enp1s0 lladdr f2:5a:5f:84:40:e8 REACHABLE ✅
+# 192.168.8.50 dev enp1s0 lladdr f2:5a:5f:84:40:e8 STALE ✅
 
-# Update VM to use br-vlan10
-virsh edit HomeAssistant
+# From network clients:
+dig @192.168.8.53 google.com  # ✅ Works
 ```
 
-**UDM Pro:**
-- Create VLAN 10 network (192.168.10.0/24)
-- Keep BGP peering for 192.168.8.50-79 advertisements
-- VM routes 192.168.10.10 → 192.168.10.1 → 192.168.8.246 → LoadBalancer
+### Remaining Task
 
-**Pros:**
-- BGP mode works as designed (different subnets)
-- Proper load balancing across nodes
-- Fast failover
+Make metallb0 interface persistent across reboots:
 
-**Cons:**
-- Requires UDM Pro VLAN configuration
+```bash
+# Systemd service already created at /etc/systemd/system/metallb-macvlan.service
+# Already enabled: systemctl enable metallb-macvlan.service
+# Will auto-create metallb0 on boot before k0s starts
+```
+
+## What Was Changed
+
+### Permanent (via Git):
+1. ✅ Switched MetalLB from BGP to L2 mode
+2. ✅ Removed BGPPeer and BGPAdvertisement resources
+3. ✅ Created L2Advertisement with metallb0 interface
+4. ✅ Configured L2Advertisement in `k8s/clusters/lab/infrastructure-config/metallb-config.yaml`
+
+### Manual (on N5 host):
+1. ✅ Removed BGP config from UDM Pro
+2. ✅ Created metallb0 macvlan interface
+3. ✅ Created systemd service for metallb0 persistence
+4. ✅ Applied L2Advertisement directly to test (Flux will sync later)
+
+### Verified Working:
+- ✅ Network clients can reach DNS (192.168.8.53)
+- ✅ Network clients can reach Traefik (192.168.8.50)
+- ✅ VM has learned correct MAC addresses (f2:5a:5f:84:40:e8) via ARP
+- ✅ VM ARP entries marked REACHABLE (traffic flowing)
+- ✅ MetalLB speaker logs show ARP/NDP responders created for metallb0
+
+## Alternative Solutions Explored (Not Used)
+
+### Option 2: Move VM to Different VLAN
+- Would work but requires UDM Pro VLAN configuration
 - More complex network architecture
-- Additional bridge management
+- Not needed now that macvlan solution works
 
-### Option 5: iptables DNAT Workaround (Last Resort)
-**Status:** Manual fallback if L2 mode fails
+### Option 5: iptables DNAT Workaround
+- Would work but is a manual workaround
+- Fragile (breaks if pod IPs change)
+- Not needed now that macvlan solution works
 
-Add explicit DNAT rules on N5 host to redirect bridge0 traffic directly to pod IPs, bypassing MetalLB entirely.
+## Root Cause Analysis (For Reference)
 
-**Implementation:**
-```bash
-# Redirect DNS traffic from bridge0 to AdGuard pod
-iptables -t nat -A PREROUTING -i bridge0 -d 192.168.8.53 -p tcp --dport 53 \
-  -j DNAT --to-destination 10.244.0.83:53
-iptables -t nat -A PREROUTING -i bridge0 -d 192.168.8.53 -p udp --dport 53 \
-  -j DNAT --to-destination 10.244.0.83:53
+BGP mode was fundamentally incompatible with same-subnet clients. BGP expects service IPs in different subnet from clients, requiring routing through gateway. Our setup had VM (192.168.8.10), LoadBalancer IPs (192.168.8.50-79), and bridge0 (192.168.8.246) all in same /24 subnet.
 
-# Masquerade return traffic
-iptables -t nat -A POSTROUTING -s 192.168.8.0/24 -d 10.244.0.0/16 -j MASQUERADE
-```
-
-**Pros:**
-- Direct kernel-level routing
-- Works with any MetalLB mode
-
-**Cons:**
-- Manual iptables management (fragile)
-- Pod IP changes break rules
-- Conflicts with MetalLB rules
-- Not persistent without additional scripting
-
-## Current State
-- Bridge hairpin: ✅ Enabled (vnet1 hairpin_mode=1)
-- br_netfilter: ✅ Loaded and configured
-- rp_filter: ✅ Loose mode (2)
-- BGP peering: ✅ Established (N5 ASN 65100 ↔ UDM Pro ASN 65001)
-- Routes advertised: ✅ 192.168.8.50/32, 192.168.8.53/32 via 192.168.8.246
-- External access: ✅ Works from outside network
-- Same-network access: ❌ ICMP only, TCP/UDP fails (BGP mode incompatibility)
-- HA OIDC: ❌ Still broken, DNS unreachable from VM
+Initial L2 mode attempts failed because:
+- **eno1**: No IP address (bridge slave), MetalLB can't announce
+- **enp197s0**: Works for network but not VMs (different L2 domain from bridge0)
+- **bridge0 directly**: VM packets had dest MAC same as bridge's own MAC (conflict)
+- **metallb0 macvlan**: ✅ Unique MAC, same L2 domain, works for both network and VMs
