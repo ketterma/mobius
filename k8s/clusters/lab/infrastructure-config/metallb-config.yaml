@@ -8,16 +8,31 @@ spec:
   addresses:
   - 192.168.8.50-192.168.8.79
 ---
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
+# BGP Peer: UDM Pro gateway
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
 metadata:
-  name: homelab-l2
+  name: udm-pro
+  namespace: metallb-system
+spec:
+  myASN: 65100        # N5 cluster ASN
+  peerASN: 65001      # UDM Pro ASN
+  peerAddress: 192.168.8.1  # UDM Pro gateway IP
+  sourceAddress: 192.168.8.246  # Use bridge0 IP for BGP connection
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/hostname: n5  # Only peer from N5 node
+---
+# BGP Advertisement: Announce LoadBalancer IPs via BGP
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: homelab-bgp
   namespace: metallb-system
 spec:
   ipAddressPools:
   - homelab-pool
-  interfaces:
-  - bridge0  # Only announce on bridge0 to allow VM traffic via vnet1
   nodeSelectors:
   - matchLabels:
-      kubernetes.io/hostname: n5  # Only announce from N5 where bridge0 and HA VM are
+      kubernetes.io/hostname: n5  # Only advertise from N5
+  # Traffic will arrive on eno1 (part of bridge0) and be routed to pods
