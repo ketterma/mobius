@@ -16,6 +16,5 @@ metadata:
 spec:
   ipAddressPools:
   - homelab-pool
-  interfaces:
-  - enp197s0  # 10G primary interface (N5 host)
-  - bridge0   # Bridge interface for HA VM network (eno1 + vnet1)
+  # interfaces: auto-select based on subnet (192.168.8.0/24)
+  # N5 will use enp197s0 or bridge0, M1 will use enp0s1
