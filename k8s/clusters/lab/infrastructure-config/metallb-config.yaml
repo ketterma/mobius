@@ -8,10 +8,11 @@ spec:
   addresses:
   - 192.168.8.50-192.168.8.79
 ---
-# L2 Advertisement: Announce LoadBalancer IPs via ARP on bridge interface
+# L2 Advertisement: Announce LoadBalancer IPs via ARP on macvlan interface
 # L2 mode is designed for same-subnet clients (VMs/containers on bridge0)
-# Announce on bridge0 (192.168.8.246) so both VMs on vnet1 and
-# network clients through eno1 can reach the services
+# Use macvlan interface (metallb0) attached to bridge0 with unique MAC
+# This avoids MAC address conflict with bridge0 itself (22:c4:a4:e0:6d:fc)
+# and allows VMs on vnet1 and network clients through eno1 to reach services
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
@@ -21,7 +22,7 @@ spec:
   ipAddressPools:
   - homelab-pool
   interfaces:
-  - bridge0  # Bridge interface - reaches both VMs and network
+  - metallb0  # Macvlan on bridge0 - unique MAC, same L2 domain
   nodeSelectors:
   - matchLabels:
       kubernetes.io/hostname: n5  # Only announce from N5 node
