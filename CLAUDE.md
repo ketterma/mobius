@@ -43,12 +43,16 @@ Hybrid homelab infrastructure spanning on-premises and cloud resources, connecte
 **User & Access:**
 - User: `jax` (passwordless sudo for administrative tasks)
 - SSH key authentication
-- Platform: **Dokploy** (Docker-based orchestration)
+- Platform: **Kubernetes** (k0s cluster with Flux CD GitOps)
 
 **Workload Architecture:**
+- **Kubernetes**: k0s cluster (N5 + M1 workers)
+  - Flux CD for GitOps
+  - OpenEBS ZFS storage (ai/homelab, vms/homelab, tank/homelab)
+  - MetalLB LoadBalancer (192.168.8.50-79)
+  - Traefik ingress controller
 - **VMs**: KVM via libvirt (Home Assistant on bridge0)
-- **Containers**: Docker (Traefik, monitoring, services) on multiple Docker bridges
-- Bridge-based networking allows VMs and containers to coexist on Services VLAN
+- **Legacy Docker**: Dokploy for remaining Docker services
 
 ## Locations
 
@@ -71,8 +75,10 @@ Hybrid homelab infrastructure spanning on-premises and cloud resources, connecte
 
 ### Key Systems
 - **N5**: `n5.jax-lab.dev` → `192.168.8.8` (Services VLAN)
-  - Dokploy platform for homelab services
-  - Home Assistant: `192.168.8.10:8123`
+  - Kubernetes cluster (k0s with Flux CD)
+  - Traefik LoadBalancer: `192.168.8.50`
+  - AdGuard Home: `192.168.8.53`
+  - Home Assistant VM: `192.168.8.10:8123`
   - Twingate Connector (homelab network)
 - **VPS**: `cloud.jax-lab.dev` → `85.31.234.30`
   - Dokploy platform for public-facing services
@@ -108,20 +114,22 @@ CNAME: *.jax-lab.dev → cloud.jax-lab.dev
 **AdGuard Home** (Split-Horizon DNS)
 - **Address**: `192.168.8.53`
 - **Purpose**: Provides split-horizon DNS for local network clients
-- **Hosted On**: N5 server (in Docker)
+- **Hosted On**: Kubernetes (N5 k0s cluster)
+- **Web UI**: `https://dns.jax-lab.dev`
 
 **DNS Rewrites in AdGuard Home:**
 ```dns
-home.jax-lab.dev → 192.168.8.8
-n8n.jax-lab.dev → 192.168.8.8
+home.jax-lab.dev → 192.168.8.50  # Traefik LoadBalancer
+dns.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
+n8n.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
 # Additional internal services as configured
 ```
 
 **Benefits:**
-- Internal clients bypass VPS and access N5 services directly
+- Internal clients bypass VPS and access services directly via Kubernetes Traefik
 - Faster response times (no external hop)
 - Reduces load on VPS and Twingate tunnel
-- N5's Let's Encrypt certificates (via DNS-01) are already valid for these domains
+- Let's Encrypt certificates (via DNS-01) are valid for these domains
 
 **Reverse DNS (PTR):**
 - UDM Pro at `192.168.4.1` provides PTR lookups for private IP ranges
@@ -177,6 +185,38 @@ $ ip route show | grep 192.168
 ```
 
 ## Traefik Reverse Proxy Architecture
+
+### Kubernetes Traefik (N5 Homelab Cluster)
+
+**Platform:** Kubernetes (k0s) with Flux CD
+**Location:** `k8s/clusters/lab/infrastructure/traefik.yaml`
+
+**Key Features:**
+- **LoadBalancer IP**: `192.168.8.50` (via MetalLB)
+- **Let's Encrypt DNS-01**: Cloudflare provider for certificate issuance
+- **Storage**: Persistent volume on OpenEBS ZFS (`openebs-zfs-homelab`)
+- **ACME Permissions**: `fsGroupChangePolicy: OnRootMismatch` for proper file permissions
+- **ExternalName Support**: Enabled for Home Assistant routing
+
+**Configuration:**
+```yaml
+service:
+  type: LoadBalancer
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.8.50
+
+additionalArguments:
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+
+providers:
+  kubernetesCRD:
+    allowExternalNameServices: true
+```
+
+**Managed Services:**
+- Home Assistant: `https://home.jax-lab.dev` (IngressRoute → ExternalName → 192.168.8.10:8123)
+- AdGuard Home: `https://dns.jax-lab.dev` (IngressRoute → ClusterIP)
 
 ### VPS Traefik Configuration
 
@@ -246,56 +286,14 @@ http:
 - **Priority**: -1000 (lowest priority - only matches if no specific router exists)
 - **Security**: Only matches `*.jax-lab.dev` domains (blocks random scanner traffic)
 
-### N5 Traefik Configuration
+### Legacy Docker Traefik (Deprecated)
 
-**Location:** `/etc/dokploy/traefik/`
+**Note:** Docker-based Traefik on N5 has been replaced by Kubernetes Traefik. The configuration below is for historical reference.
 
-#### Main Config (`traefik.yml`)
-```yaml
-certificatesResolvers:
-  letsencrypt:
-    acme:
-      email: test@localhost.com
-      storage: /etc/dokploy/traefik/dynamic/acme.json
-      dnsChallenge:
-        provider: cloudflare
-        delayBeforeCheck: 30
-        resolvers:
-          - "1.1.1.1:53"
-          - "1.0.0.1:53"
-```
-
-**Key Features:**
-- **DNS-01 challenge** (N5 is behind NAT, cannot use HTTP-01)
-- **Cloudflare provider** for DNS validation
-- Environment variable: `CF_DNS_API_TOKEN` set in Traefik container
-
-**Why DNS Challenge?**
-N5 is behind NAT and not directly reachable from the internet. HTTP-01 challenges would reach the VPS first, which cannot forward the ACME validation properly. DNS-01 allows N5's Traefik to prove domain ownership by creating DNS TXT records via Cloudflare API.
-
-#### Service Routing (`dynamic/homeassistant.yml`)
-```yaml
-http:
-  routers:
-    homeassistant-http:
-      rule: Host(`home.jax-lab.dev`)
-      entryPoints: [ "web" ]
-      service: homeassistant
-
-    homeassistant:
-      rule: Host(`home.jax-lab.dev`)
-      entryPoints: [ "websecure" ]
-      tls:
-        certResolver: letsencrypt
-      service: homeassistant
-
-  services:
-    homeassistant:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.8.10:8123"
-        passHostHeader: true
-```
+**Previous Location:** `/etc/dokploy/traefik/` (Docker)
+- Used DNS-01 challenge with Cloudflare
+- Routed to services on Services VLAN
+- Now superseded by Kubernetes IngressRoutes
 
 ## Current Architecture & Traffic Flow
 
@@ -304,24 +302,24 @@ http:
 1. User requests https://home.jax-lab.dev
 2. DNS resolves to VPS (85.31.234.30)
 3. VPS Traefik receives request
-4. VPS catch-all router forwards to https://192.168.8.8 via Twingate
-5. N5 Traefik receives request
-6. N5 routes to Home Assistant (192.168.8.10:8123)
+4. VPS catch-all router forwards to https://192.168.8.50 via Twingate
+5. Kubernetes Traefik (LoadBalancer) receives request
+6. IngressRoute routes to Home Assistant ExternalName service (192.168.8.10:8123)
 7. Response flows back through same path
 ```
 
 **Certificate Chain:**
-- VPS terminates TLS with Let's Encrypt wildcard/specific cert
-- Re-encrypts for transit to N5 over Twingate
-- N5 terminates with its own Let's Encrypt cert (DNS-01)
+- VPS terminates TLS with Let's Encrypt cert (HTTP-01)
+- Re-encrypts for transit over Twingate
+- Kubernetes Traefik terminates with Let's Encrypt cert (DNS-01)
 - Double encryption provides defense in depth
 
 ### Monitoring Traffic Flow (VPS → Homelab)
 ```
-1. Uptime Kuma on VPS monitors https://192.168.8.8
+1. Uptime Kuma on VPS monitors https://192.168.8.50
 2. Request goes directly through Twingate tunnel (sdwan0)
-3. Reaches N5 Traefik
-4. N5 responds with service status
+3. Reaches Kubernetes Traefik LoadBalancer
+4. Service responds with status
 ```
 
 **Note:** Uptime Kuma had NSCD (Name Service Cache Daemon) disabled to prevent DNS caching issues causing false positives.
@@ -335,12 +333,16 @@ http:
 - **Dokploy**: Container orchestration
   - URL: `https://dokploy.jax-lab.dev`
 
-### N5 Services
-- **Home Assistant**: Smart home automation
+### N5 Kubernetes Services
+- **Traefik**: Ingress controller and LoadBalancer
+  - IP: `192.168.8.50`
+  - Let's Encrypt DNS-01 certificates
+- **AdGuard Home**: DNS server with ad-blocking
+  - DNS: `192.168.8.53`
+  - Web UI: `https://dns.jax-lab.dev`
+- **Home Assistant**: Smart home automation (VM, not in K8s)
   - Internal: `http://192.168.8.10:8123`
-  - External: `https://home.jax-lab.dev` (via VPS reverse proxy)
-- **Dokploy**: Container orchestration for homelab
-  - Internal access only
+  - External: `https://home.jax-lab.dev` (via Traefik IngressRoute)
 
 ## Traefik v3 Migration Notes
 
@@ -382,7 +384,36 @@ rule: HostRegexp(`^.+\.jax-lab\.dev$`)  # ✅ Correct v3 syntax
 - Min duration filter: 10ms (reduces noise from ultra-fast 404s)
 - **Important:** Logs stored outside `/etc/dokploy/traefik/dynamic/` to prevent Traefik from rescanning configs on every request
 
-## Recent Changes (2025-10-28)
+## Recent Changes (2025-10-29/30)
+
+### ✅ Completed
+1. **Kubernetes Homelab Cluster Deployment**
+   - Deployed k0s cluster on N5 + M1 workers
+   - Configured Flux CD for GitOps management
+   - OpenEBS ZFS storage with StorageClass patches for all ZFS pools
+   - MetalLB LoadBalancer pool (192.168.8.50-79)
+
+2. **Traefik Migration to Kubernetes**
+   - Deployed Traefik via Helm with Flux
+   - Let's Encrypt DNS-01 with Cloudflare provider
+   - Fixed ACME permissions with `fsGroupChangePolicy: OnRootMismatch`
+   - Enabled ExternalName services for Home Assistant routing
+   - LoadBalancer IP: 192.168.8.50
+
+3. **AdGuard Home Migration to Kubernetes**
+   - Migrated Docker AdGuard to Kubernetes
+   - Copied configuration and data (work/conf volumes)
+   - Switched to production DNS IP (192.168.8.53)
+   - Web UI accessible at `https://dns.jax-lab.dev`
+   - Fixed service port mapping (targetPort 80)
+
+4. **Service Verification**
+   - Home Assistant: `https://home.jax-lab.dev` ✅
+   - AdGuard Home: `https://dns.jax-lab.dev` ✅
+   - DNS queries on 192.168.8.53 ✅
+   - All Let's Encrypt certificates issued ✅
+
+## Previous Changes (2025-10-28)
 
 ### ✅ Completed
 1. **Split-Horizon DNS via AdGuard Home**
