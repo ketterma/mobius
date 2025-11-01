@@ -25,17 +25,17 @@ spec:
       name: webhook
       webhook:
         image:
-          repository: ghcr.io/zekker6/external-dns-provider-adguard
-          tag: latest
+          repository: ghcr.io/muhlba91/external-dns-provider-adguard
+          tag: v9.1.0
         env:
-          - name: ADGUARD_HOME_URL
-            value: "http://adguard-home-web.adguard-home.svc.cluster.local:80/control/"
-          - name: ADGUARD_HOME_USER
+          - name: ADGUARD_URL
+            value: "http://adguard-home-web.adguard-home.svc.cluster.local:80"
+          - name: ADGUARD_USER
             valueFrom:
               secretKeyRef:
                 name: adguard-credentials
                 key: ADGUARD_HOME_USER
-          - name: ADGUARD_HOME_PASS
+          - name: ADGUARD_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: adguard-credentials
@@ -45,17 +45,15 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8888
+            port: 8080
           initialDelaySeconds: 10
           timeoutSeconds: 5
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 8888
-          initialDelaySeconds: 5
+            port: 8080
+          initialDelaySeconds: 10
           timeoutSeconds: 5
-        securityContext:
-          runAsNonRoot: false
 
     # External-DNS configuration
     txtOwnerId: lab-cluster
@@ -63,10 +61,6 @@ spec:
     policy: sync
     logLevel: info
     interval: 1m
-
-    # Pod security context - allow webhook to run as root
-    securityContext:
-      runAsNonRoot: false
 
     # Webhook provider configuration
     extraArgs:
