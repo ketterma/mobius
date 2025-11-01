@@ -1,0 +1,101 @@
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: homelab
+spec:
+  hosts:
+  # N5 - Controller + Worker
+  - openSSH:
+      address: 192.168.8.8
+      user: jax
+      port: 22
+    role: controller+worker
+    noTaints: true
+    installFlags:
+      - --kubelet-extra-args="--node-ip=192.168.8.9"
+
+  # M1 - Worker only
+  - openSSH:
+      address: 192.168.8.81
+      user: jax
+      port: 22
+    role: worker
+
+  k0s:
+    version: v1.32.8+k0s.0
+    config:
+      apiVersion: k0s.k0sproject.io/v1beta1
+      kind: ClusterConfig
+      metadata:
+        name: homelab
+      spec:
+        api:
+          k0sApiPort: 9443
+          port: 6443
+        installConfig:
+          users:
+            etcdUser: etcd
+            kineUser: kube-apiserver
+            konnectivityUser: konnectivity-server
+            kubeAPIserverUser: kube-apiserver
+            kubeSchedulerUser: kube-scheduler
+        konnectivity:
+          adminPort: 8133
+          agentPort: 8132
+        network:
+          kubeProxy:
+            disabled: false
+            mode: iptables
+          podCIDR: 10.244.0.0/16
+          provider: custom
+          serviceCIDR: 10.96.0.0/12
+        podSecurityPolicy:
+          defaultPolicy: 00-k0s-privileged
+        storage:
+          type: etcd
+        telemetry:
+          enabled: false
+        extensions:
+          helm:
+            repositories:
+            - name: openebs
+              url: https://openebs.github.io/openebs
+            charts:
+            # OpenEBS ZFS storage - CSI driver only, storage classes managed by Flux
+            - name: openebs
+              chartname: openebs/openebs
+              version: "4.3.3"
+              namespace: openebs
+              order: 1
+              values: |
+                zfs-localpv:
+                  enabled: true
+                  zfsNode:
+                    kubeletDir: "/var/lib/k0s/kubelet/"
+
+                localpv-provisioner:
+                  enabled: false
+
+                engines:
+                  local:
+                    lvm:
+                      enabled: false
+                    zfs:
+                      enabled: true
+                  replicated:
+                    mayastor:
+                      enabled: false
+  options:
+    wait:
+      enabled: true
+    drain:
+      enabled: true
+      gracePeriod: 2m0s
+      timeout: 5m0s
+      force: true
+      ignoreDaemonSets: true
+      deleteEmptyDirData: true
+    concurrency:
+      limit: 30
+      workerDisruptionPercent: 10
+      uploads: 5
