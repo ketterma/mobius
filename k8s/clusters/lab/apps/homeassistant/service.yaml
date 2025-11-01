@@ -6,7 +6,7 @@ metadata:
   namespace: traefik
 spec:
   type: ExternalName
-  externalName: 192.168.8.10
+  externalName: 192.168.64.2
   ports:
     - name: http
       port: 8123

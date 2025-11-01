@@ -48,7 +48,7 @@ spec:
   hosts:
     - role: controller+worker
       ssh:
-        address: 192.168.8.8
+        address: 192.168.4.5
         user: jax
         port: 22
         keyPath: /Users/jax/.ssh/id_ed25519
@@ -61,9 +61,9 @@ spec:
         name: k0smotron-management
       spec:
         api:
-          address: 192.168.8.8
+          address: 192.168.4.5
           sans:
-            - 192.168.8.8
+            - 192.168.4.5
             - k0smotron-management
         network:
           provider: kube-router
@@ -78,7 +78,7 @@ k0sctl apply --config k0smotron-management-config.yaml
 
 ```bash
 # SSH to N5
-ssh jax@192.168.8.8
+ssh jax@192.168.4.5
 
 # Download and install k0s
 curl -sSLf https://get.k0s.sh | sudo sh

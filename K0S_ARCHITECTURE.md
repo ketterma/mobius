@@ -17,16 +17,38 @@ This document outlines the proposed Kubernetes architecture to replace the curre
 
 ---
 
-## IP Allocation (Services VLAN: 192.168.8.0/24)
+## IP Allocation (VLAN Architecture)
 
-| Host | IP | Purpose | Mnemonic |
-|------|----|---------|----------|
-| N5 | 192.168.8.8 | k0smotron management cluster + primary worker | Last digit = 8 |
-| Home Assistant VM | 192.168.8.10 | Smart home automation (KubeVirt VM) | .10 = Home Assistant |
-| **M1 macOS host** | **192.168.8.41** | **Mac Mini M1 host (UTM hypervisor)** | **M1 = 41** |
-| **M1 Ubuntu VM** | **192.168.8.81** | **Monitoring + CI/CD (k8s worker)** | **M1 VM = 81** |
-| **M4** | **192.168.8.44** | **AI inference (Osaurus on macOS)** | **M4 = 44** |
-| AdGuard Home | 192.168.8.53 | Split-horizon DNS | DNS port 53 |
+### VLAN 4 (192.168.4.0/24) - Services/k0s Nodes
+| Host | IP | Purpose | Notes |
+|------|----|---------|-------|
+| Gateway | 192.168.4.1 | UDM Pro gateway | Default route |
+| N5 | 192.168.4.5 | k0s controller+worker, host SSH | Primary server |
+| **M1 macOS host** | **192.168.4.11** | **Mac Mini M1 host (UTM hypervisor)** | **M1 = 11** |
+| **M4** | **192.168.4.14** | **AI inference (Osaurus on macOS)** | **M4 = 14** |
+| AdGuard Home | 192.168.4.53 | Split-horizon DNS (LoadBalancer) | DNS port 53 |
+| **M1 Ubuntu VM** | **192.168.4.81** | **Monitoring + CI/CD (k8s worker)** | **Worker node** |
+
+### VLAN 8 (192.168.8.0/24) - Infrastructure VIPs
+| Service | IP | Purpose | Notes |
+|---------|----|---------|----- |
+| Traefik | 192.168.8.50 | Ingress LoadBalancer | MetalLB pool |
+| Services pool | 192.168.8.51-79 | Additional LoadBalancers | MetalLB pool |
+
+### VLAN 64 (192.168.64.0/20) - IoT / VMs
+| Host | IP | Purpose | Notes |
+|------|----|---------|-------|
+| Gateway | 192.168.64.1 | N5 bridge64 | VM gateway |
+| Home Assistant VM | 192.168.64.2 | Smart home automation (KubeVirt VM) | IoT network |
+
+### VLAN 16 (192.168.16.0/20) - Sandbox / Untrusted
+| Purpose | Notes |
+|---------|-------|
+| Future sandbox workloads | Reserved for future use |
+
+### External
+| Host | IP | Purpose | Notes |
+|------|----|---------|-------|
 | VPS | 85.31.234.30 | Public ingress (cloud-cluster worker) | Public IP |
 
 ---
@@ -126,13 +148,13 @@ metadata:
   namespace: ai
 spec:
   type: ExternalName
-  externalName: m4.jax-lab.dev  # Static IP: 192.168.8.44
+  externalName: m4.jax-lab.dev  # Static IP: 192.168.4.14
   ports:
     - port: 8080
       name: api
 ```
 
-**Network**: `192.168.8.44` on Services VLAN (M4 = 44)
+**Network**: `192.168.4.14` on Services VLAN 4 (M4 = 14)
 
 ---
 
@@ -149,10 +171,10 @@ spec:
 - CPU: 4 cores (of 8)
 - RAM: 6GB (leave 2GB for macOS host)
 - Disk: 50GB thin-provisioned
-- Network: Bridged to Services VLAN
-- Static IP: `192.168.8.81` (M1 VM = 81)
+- Network: Bridged to Services VLAN 4
+- Static IP: `192.168.4.81` (M1 VM = 81)
 
-**macOS Host Network**: `192.168.8.41` (M1 = 41)
+**macOS Host Network**: `192.168.4.11` (M1 = 11)
 
 **Joins**: homelab-cluster as worker node
 
@@ -287,24 +309,24 @@ reclaimPolicy: Retain
 
 **Secondary Interface (eth1):**
 - Binding: bridge (via Multus NetworkAttachmentDefinition)
-- Bridge: `bridge0` (existing bridge on eno1 - 5G NIC)
-- IP: `192.168.8.10/24` (static, configured via cloud-init)
-- Purpose: LAN access for IoT device discovery (mDNS, ARP, SSDP)
-- Gateway: `192.168.8.1` (UDM Pro)
-- DNS: `192.168.8.53` (AdGuard Home), `192.168.4.1` (UDM Pro)
+- Bridge: `bridge64` (IoT VLAN bridge on eno1.64 - 5G NIC)
+- IP: `192.168.64.2/20` (static, configured via cloud-init)
+- Purpose: IoT VLAN access for device discovery (mDNS, ARP, SSDP)
+- Gateway: `192.168.64.1` (N5 bridge64)
+- DNS: `192.168.4.53` (AdGuard Home on VLAN 4)
 
 **NetworkAttachmentDefinition:**
 ```yaml
 apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
 metadata:
-  name: services-vlan-bridge
+  name: iot-vlan-bridge
 spec:
   config: |
     {
       "cniVersion": "0.3.1",
       "type": "bridge",
-      "bridge": "bridge0",
+      "bridge": "bridge64",
       "disableContainerInterface": true,
       "macspoofchk": true
     }
@@ -349,18 +371,18 @@ spec:
   - Removes need for wildcard `*.jax-lab.dev` CNAME
   - Creates explicit records: `home.jax-lab.dev`, `uptime.jax-lab.dev`, etc.
 - **AdGuard Home Provider**: Auto-create DNS rewrites for split-horizon
-  - Internal clients get N5 IP (`192.168.8.8`) for services
+  - Internal clients get Traefik LoadBalancer IP (`192.168.8.50`) for services
   - External clients get VPS IP (`85.31.234.30`)
 
 **Multi-attach Networking**: Multus CNI
-- Allows VMs to attach to `bridge0` (eno1) for Services VLAN access
+- Allows VMs to attach to `bridge64` (eno1.64) for IoT VLAN access
 
 **Twingate Integration**:
 - VPS can access N5 services via `192.168.0.0/16` route
 - No changes to existing Twingate connector/client setup
 
 **Split-Horizon DNS**:
-- AdGuard Home rewrites maintained (`home.jax-lab.dev` → `192.168.8.8`)
+- AdGuard Home rewrites maintained (`home.jax-lab.dev` → `192.168.8.50`)
 - Internal clients bypass VPS, external clients hit VPS reverse proxy
 
 ---
@@ -415,7 +437,7 @@ metadata:
   name: home-assistant
   annotations:
     external-dns.alpha.kubernetes.io/target: "85.31.234.30"  # VPS IP
-    external-dns.alpha.kubernetes.io/internal-target: "192.168.8.8"  # N5 IP
+    external-dns.alpha.kubernetes.io/internal-target: "192.168.8.50"  # Traefik LoadBalancer
 spec:
   rules:
     - host: home.jax-lab.dev
@@ -423,7 +445,7 @@ spec:
 
 **What happens**:
 1. external-dns (Cloudflare provider) creates: `home.jax-lab.dev A 85.31.234.30`
-2. external-dns (AdGuard provider) creates DNS rewrite: `home.jax-lab.dev → 192.168.8.8`
+2. external-dns (AdGuard provider) creates DNS rewrite: `home.jax-lab.dev → 192.168.8.50`
 3. Delete Ingress → DNS records auto-removed
 
 **Providers**:
@@ -480,9 +502,9 @@ spec:
       networks:
         - name: default
           pod: {}
-        - name: services-vlan
+        - name: iot-vlan
           multus:
-            networkName: services-vlan-bridge
+            networkName: iot-vlan-bridge
       volumes:
         - name: root
           persistentVolumeClaim:
@@ -676,16 +698,16 @@ flux bootstrap github \
   - Network policy support available if needed
   - Twingate confirmed CNI-agnostic (works with any CNI)
 
-### 3. Traefik Version
+### 3. Traefik Version & Architecture
 - [x] **DECISION**: Install Traefik v3 via Helm in each cluster
 - [x] **DECISION**: Dual-Traefik architecture (per-cluster deployment)
-  - **cloud-cluster** (VPS): Public ingress + catch-all proxy to homelab
-  - **homelab-cluster** (N5): Internal services + DNS-01 certificates
+  - **cloud-cluster** (VPS): Public ingress + catch-all proxy to homelab Traefik at 192.168.8.50
+  - **homelab-cluster** (N5): Internal services + DNS-01 certificates at 192.168.8.50 (VLAN 8)
   - **sandbox-cluster** (N5): Independent ingress for testing
 - [x] **Rationale**:
   - Partition resilience (N5 Traefik accessible locally during outage)
   - No unnecessary hops (VPS serves VPS resources directly)
-  - VPS routes specific domains to homelab via Twingate (catch-all pattern)
+  - VPS routes wildcard `*.jax-lab.dev` to Traefik LoadBalancer via Twingate
 
 ### 4. Storage
 - [x] **DECISION**: Use OpenEBS ZFS LocalPV CSI driver
@@ -722,7 +744,7 @@ flux bootstrap github \
 
 1. **Declarative Everything**: Infrastructure, DNS, VMs, and storage as code
 2. **Incremental Migration**: Don't replace everything at once
-3. **Preserve Existing IPs**: Home Assistant stays at `192.168.8.10`
+3. **Network Segmentation**: VLAN-based architecture isolates services, infrastructure VIPs, and IoT networks
 4. **Retain Policies**: ZFS retain policy (don't delete datasets on PVC deletion)
 5. **GitOps-Ready**: All configs in YAML, version controlled
 6. **Failure Domains**: Understand what breaks if N5 or VPS goes down

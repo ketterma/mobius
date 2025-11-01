@@ -1,28 +1,52 @@
 ---
+# Infrastructure VLAN 4 pool - for DNS and critical services
+# Announced via L2 mode on VLAN 4 interface
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: homelab-pool
+  name: infra-pool-vlan4
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.4.50-192.168.4.59
+---
+# Services VLAN 8 pool - for Traefik and application services
+# Announced via L2 mode on VLAN 8 interface
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: services-pool-vlan8
   namespace: metallb-system
 spec:
   addresses:
   - 192.168.8.50-192.168.8.79
 ---
-# L2 Advertisement: Announce LoadBalancer IPs via ARP on macvlan interface
-# L2 mode is designed for same-subnet clients (VMs/containers on bridge0)
-# Use macvlan interface (metallb0) attached to bridge0 with unique MAC
-# This avoids MAC address conflict with bridge0 itself (22:c4:a4:e0:6d:fc)
-# and allows VMs on vnet1 and network clients through eno1 to reach services
+# L2 Advertisement for VLAN 4 infrastructure services
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
-  name: homelab-l2
+  name: l2-vlan4
   namespace: metallb-system
 spec:
   ipAddressPools:
-  - homelab-pool
+  - infra-pool-vlan4
   interfaces:
-  - metallb0  # Macvlan on bridge0 - unique MAC, same L2 domain
+  - enp197s0.4  # VLAN 4 interface for k0s nodes and infrastructure
   nodeSelectors:
   - matchLabels:
-      kubernetes.io/hostname: n5  # Only announce from N5 node
+      kubernetes.io/hostname: n5
+---
+# L2 Advertisement for VLAN 8 application services
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2-vlan8
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - services-pool-vlan8
+  interfaces:
+  - enp197s0.8  # VLAN 8 interface for application LoadBalancers
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/hostname: n5

@@ -34,11 +34,14 @@ Hybrid homelab infrastructure spanning on-premises and cloud resources, connecte
 - Type: High-performance workstation/server
 
 **Network Configuration:**
-- **Primary Interface**: `enp197s0` (10G NIC, main host interface)
-- **Secondary Interface**: `eno1` (5G NIC, bridge master for VM/container workloads)
-  - Member of `bridge0` for network sharing to VMs and containers
-  - VM (Home Assistant) attached via `vnet1`
-  - Docker containers access via bridge0
+- **Primary Interface**: `enp197s0` (10G NIC, VLAN trunk)
+  - `enp197s0.4` (VLAN 4): Services/k0s nodes - 192.168.4.5/24
+  - `enp197s0.8` (VLAN 8): Infrastructure VIPs (MetalLB pool only, no host IP)
+  - `enp197s0.16` (VLAN 16): Sandbox/Untrusted workloads (future use, no host IP)
+- **Secondary Interface**: `eno1` (5G NIC, IoT bridge master)
+  - `eno1.64` (VLAN 64): IoT network for VMs
+  - `bridge64`: Bridge for IoT VLAN (192.168.64.1/20)
+  - VM (Home Assistant) attached via `vnet1` to bridge64
 
 **User & Access:**
 - User: `jax` (passwordless sudo for administrative tasks)
@@ -46,13 +49,14 @@ Hybrid homelab infrastructure spanning on-premises and cloud resources, connecte
 - Platform: **Kubernetes** (k0s cluster with Flux CD GitOps)
 
 **Workload Architecture:**
-- **Kubernetes**: k0s cluster (N5 + M1 workers)
+- **Kubernetes**: k0s cluster (N5 + M1-ubuntu workers)
   - Flux CD for GitOps
   - OpenEBS ZFS storage (ai/homelab, vms/homelab, tank/homelab)
-  - MetalLB LoadBalancer (192.168.8.50-79)
-  - Traefik ingress controller
-- **VMs**: KVM via libvirt (Home Assistant on bridge0)
-- **Legacy Docker**: Dokploy for remaining Docker services
+  - MetalLB LoadBalancer (L2 mode):
+    - Infrastructure pool (VLAN 4): 192.168.4.50-59
+    - Services pool (VLAN 8): 192.168.8.50-79
+  - Traefik ingress controller (192.168.8.50)
+- **VMs**: KVM via libvirt (Home Assistant on bridge64, VLAN 64)
 
 ## Locations
 
@@ -69,17 +73,29 @@ Hybrid homelab infrastructure spanning on-premises and cloud resources, connecte
 
 ## Network Topology
 
-### Home Networks
-- **Infra VLAN**: `192.168.4.x` (network infrastructure)
-- **Services VLAN**: `192.168.8.0/24` (applications and services)
+### Home Networks (VLAN Architecture)
+- **VLAN 4** (192.168.4.0/24): Services/k0s nodes/SSH/NAS
+  - Gateway: 192.168.4.1 (UDM Pro)
+  - N5 host: 192.168.4.5
+  - M1-ubuntu worker: 192.168.4.81
+  - AdGuard Home DNS: 192.168.4.53 (LoadBalancer)
+- **VLAN 8** (192.168.8.0/24): Infrastructure VIPs (MetalLB services)
+  - Traefik LoadBalancer: 192.168.8.50
+  - Additional service VIPs: 192.168.8.51-79
+- **VLAN 16** (192.168.16.0/20): Sandbox/Untrusted workloads (future use)
+- **VLAN 64** (192.168.64.0/20): IoT devices and VMs
+  - Gateway: 192.168.64.1 (N5 bridge64)
+  - Home Assistant VM: 192.168.64.2
 
 ### Key Systems
-- **N5**: `n5.jax-lab.dev` → `192.168.8.8` (Services VLAN)
+- **N5**: `n5.jax-lab.dev` → `192.168.4.5` (VLAN 4)
   - Kubernetes cluster (k0s with Flux CD)
-  - Traefik LoadBalancer: `192.168.8.50`
-  - AdGuard Home: `192.168.8.53`
-  - Home Assistant VM: `192.168.8.10:8123`
+  - Traefik LoadBalancer: `192.168.8.50` (VLAN 8)
+  - AdGuard Home: `192.168.4.53` (VLAN 4)
+  - Home Assistant VM: `192.168.64.2:8123` (VLAN 64)
   - Twingate Connector (homelab network)
+- **M1-ubuntu**: `m1-ubuntu.local` → `192.168.4.81` (VLAN 4)
+  - Kubernetes worker node
 - **VPS**: `cloud.jax-lab.dev` → `85.31.234.30`
   - Dokploy platform for public-facing services
   - Twingate Client + Connector
@@ -112,16 +128,16 @@ CNAME: *.jax-lab.dev → cloud.jax-lab.dev
 ### Local DNS Resolvers
 
 **AdGuard Home** (Split-Horizon DNS)
-- **Address**: `192.168.8.53`
+- **Address**: `192.168.4.53` (VLAN 4)
 - **Purpose**: Provides split-horizon DNS for local network clients
 - **Hosted On**: Kubernetes (N5 k0s cluster)
 - **Web UI**: `https://dns.jax-lab.dev`
 
 **DNS Rewrites in AdGuard Home:**
 ```dns
-home.jax-lab.dev → 192.168.8.50  # Traefik LoadBalancer
-dns.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
-n8n.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
+home.jax-lab.dev → 192.168.8.50  # Traefik LoadBalancer (VLAN 8)
+dns.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer (VLAN 8)
+n8n.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer (VLAN 8)
 # Additional internal services as configured
 ```
 
@@ -134,12 +150,12 @@ n8n.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
 **Reverse DNS (PTR):**
 - UDM Pro at `192.168.4.1` provides PTR lookups for private IP ranges
 - AdGuard Home configured to use UDM Pro for private reverse DNS
-- Resolves IPs like `192.168.8.10` to hostnames (e.g., `home.lab`)
+- Resolves IPs like `192.168.64.2` to hostnames (e.g., `home-assistant.local`)
 - Improves client identification in AdGuard Home logs
 
 **UDM Pro Local DNS:**
 ```dns
-n5.jax-lab.dev → 192.168.8.8
+n5.jax-lab.dev → 192.168.4.5
 ```
 
 **Note:** The wildcard CNAME `*.jax-lab.dev` points all subdomains to the VPS, which acts as a reverse proxy to internal services via Twingate. Split-horizon DNS allows internal clients to bypass this.
@@ -169,11 +185,14 @@ n5.jax-lab.dev → 192.168.8.8
 ### Connectivity Verification
 ```bash
 # VPS can reach homelab services via Twingate
-$ ping 192.168.8.8
+$ ping 192.168.4.5
 ✅ ICMP works (note: ICMP forwarding has limitations, use TCP for monitoring)
 
-$ nc -zv 192.168.8.8 443
-✅ Connection to 192.168.8.8 443 port [tcp/https] succeeded!
+$ nc -zv 192.168.4.5 443
+✅ Connection to 192.168.4.5 443 port [tcp/https] succeeded!
+
+$ nc -zv 192.168.8.50 443
+✅ Connection to 192.168.8.50 443 port [tcp/https] succeeded!  # Traefik VIP
 
 # Twingate tunnel interface on VPS
 $ ip link show sdwan0
@@ -215,7 +234,7 @@ providers:
 ```
 
 **Managed Services:**
-- Home Assistant: `https://home.jax-lab.dev` (IngressRoute → ExternalName → 192.168.8.10:8123)
+- Home Assistant: `https://home.jax-lab.dev` (IngressRoute → ExternalName → 192.168.64.2:8123)
 - AdGuard Home: `https://dns.jax-lab.dev` (IngressRoute → ClusterIP)
 
 ### VPS Traefik Configuration
@@ -265,14 +284,14 @@ http:
     internal-http:
       loadBalancer:
         servers:
-          - url: "http://192.168.8.8"
+          - url: "http://192.168.8.50"  # Traefik LoadBalancer on VLAN 8
         passHostHeader: true
 
     internal-https:
       loadBalancer:
         serversTransport: internal-https
         servers:
-          - url: "https://192.168.8.8"
+          - url: "https://192.168.8.50"  # Traefik LoadBalancer on VLAN 8
         passHostHeader: true
 
   serversTransports:
@@ -303,8 +322,8 @@ http:
 2. DNS resolves to VPS (85.31.234.30)
 3. VPS Traefik receives request
 4. VPS catch-all router forwards to https://192.168.8.50 via Twingate
-5. Kubernetes Traefik (LoadBalancer) receives request
-6. IngressRoute routes to Home Assistant ExternalName service (192.168.8.10:8123)
+5. Kubernetes Traefik LoadBalancer (VLAN 8) receives request
+6. IngressRoute routes to Home Assistant ExternalName service (192.168.64.2:8123 on VLAN 64)
 7. Response flows back through same path
 ```
 
@@ -335,13 +354,13 @@ http:
 
 ### N5 Kubernetes Services
 - **Traefik**: Ingress controller and LoadBalancer
-  - IP: `192.168.8.50`
+  - IP: `192.168.8.50` (VLAN 8)
   - Let's Encrypt DNS-01 certificates
 - **AdGuard Home**: DNS server with ad-blocking
-  - DNS: `192.168.8.53`
+  - DNS: `192.168.4.53` (VLAN 4)
   - Web UI: `https://dns.jax-lab.dev`
 - **Home Assistant**: Smart home automation (VM, not in K8s)
-  - Internal: `http://192.168.8.10:8123`
+  - Internal: `http://192.168.64.2:8123` (VLAN 64)
   - External: `https://home.jax-lab.dev` (via Traefik IngressRoute)
 
 ## Traefik v3 Migration Notes
@@ -534,8 +553,10 @@ twingate status
 ip route show | grep sdwan0
 
 # VPS: Test connectivity to homelab
-nc -zv 192.168.8.8 443
-curl -v http://192.168.8.8
+nc -zv 192.168.4.5 22      # N5 host SSH
+nc -zv 192.168.8.50 443    # Traefik LoadBalancer
+nc -zv 192.168.4.53 53     # AdGuard DNS
+curl -v http://192.168.8.50
 
 # N5: Check Twingate connector status
 sudo docker ps | grep twingate
@@ -579,8 +600,9 @@ For internal users to bypass VPS and access homelab directly:
 
 **AdGuard Home DNS Rewrites:**
 ```dns
-home.jax-lab.dev → 192.168.8.8
-n8n.jax-lab.dev → 192.168.8.8
+home.jax-lab.dev → 192.168.8.50  # Traefik LoadBalancer
+n8n.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
+dns.jax-lab.dev → 192.168.8.50   # Traefik LoadBalancer
 # etc.
 ```
 
@@ -589,11 +611,39 @@ n8n.jax-lab.dev → 192.168.8.8
 - N5's Let's Encrypt certs already valid via DNS-01
 - Reduces load on VPS and Twingate
 
-**Current Status:** ✅ Implemented via AdGuard Home DNS rewrites (2025-10-28)
+**Current Status:** ✅ Implemented via AdGuard Home DNS rewrites (updated 2025-11-01)
+
+## Recent Changes (2025-11-01)
+
+### ✅ VLAN Migration Completed
+1. **Network Segmentation**
+   - Migrated from single VLAN (192.168.8.x) to multi-VLAN architecture
+   - VLAN 4 (192.168.4.0/24): Services/k0s nodes/SSH
+   - VLAN 8 (192.168.8.0/24): Infrastructure VIPs (MetalLB LoadBalancers)
+   - VLAN 16 (192.168.16.0/20): Sandbox/Untrusted (future use)
+   - VLAN 64 (192.168.64.0/20): IoT devices and VMs
+
+2. **IP Address Changes**
+   - N5 host: 192.168.8.8 → 192.168.4.5
+   - M1-ubuntu worker: 192.168.8.81 → 192.168.4.81
+   - AdGuard Home DNS: 192.168.8.53 → 192.168.4.53
+   - Traefik: 192.168.8.50 (unchanged, now on dedicated VLAN 8)
+   - Home Assistant VM: 192.168.8.10 → 192.168.64.2
+
+3. **MetalLB Reconfiguration**
+   - Removed BGP mode (simplified to L2 only)
+   - Split pools between VLANs:
+     - Infrastructure pool (VLAN 4): 192.168.4.50-59 (DNS, critical services)
+     - Services pool (VLAN 8): 192.168.8.50-79 (Traefik, applications)
+
+4. **Bridge Reconfiguration**
+   - Renamed bridge0 → bridge64 for IoT VLAN
+   - Home Assistant VM now on dedicated IoT network (VLAN 64)
 
 ## Notes
 - Twingate provides secure connectivity between home and cloud resources without VPN complexity
 - UDM Pro handles local DNS resolution for home resources
-- Infra VLAN (192.168.4.x) contains network infrastructure (gateway, routers, switches, APs)
-- Services VLAN (192.168.8.0/24) contains application servers and services
+- VLAN 4 contains k0s nodes, services, NAS, SSH access
+- VLAN 8 contains MetalLB LoadBalancer VIPs only (no host IPs)
+- VLAN 64 contains IoT devices and VMs
 - All Traefik configs use YAML format and file provider with directory watching

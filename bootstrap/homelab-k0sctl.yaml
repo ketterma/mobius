@@ -6,17 +6,17 @@ spec:
   hosts:
   # N5 - Controller + Worker
   - openSSH:
-      address: 192.168.8.8
+      address: 192.168.4.5
       user: jax
       port: 22
     role: controller+worker
     noTaints: true
     installFlags:
-      - --kubelet-extra-args="--node-ip=192.168.8.9"
+      - --kubelet-extra-args="--node-ip=192.168.4.5"
 
-  # M1 - Worker only
+  # M1-ubuntu - Worker only
   - openSSH:
-      address: 192.168.8.81
+      address: 192.168.4.81
       user: jax
       port: 22
     role: worker

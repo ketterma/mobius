@@ -5,7 +5,7 @@ metadata:
   name: adguard-home-dns
   namespace: adguard-home
   annotations:
-    metallb.universe.tf/loadBalancerIPs: 192.168.8.53
+    metallb.universe.tf/loadBalancerIPs: 192.168.4.53
 spec:
   type: LoadBalancer
   selector:

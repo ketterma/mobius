@@ -12,7 +12,7 @@ This is the foundational step that must be completed before anything else.
   ```bash
   brew install k0sproject/tap/k0sctl
   ```
-- SSH access to N5 (`192.168.8.8` as user `jax`)
+- SSH access to N5 (`192.168.4.5` as user `jax`)
 - Git repo cloned locally
 
 ### Deploy k0s Management Cluster
