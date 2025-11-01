@@ -22,6 +22,7 @@ spec:
   - 192.168.8.50-192.168.8.79
 ---
 # L2 Advertisement for VLAN 4 infrastructure services
+# Announced on main interface (untagged VLAN 1/4) for global reachability
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
@@ -31,7 +32,7 @@ spec:
   ipAddressPools:
   - infra-pool-vlan4
   interfaces:
-  - enp197s0.4  # VLAN 4 interface for k0s nodes and infrastructure
+  - enp197s0  # Main interface (untagged = VLAN 1/4) for DNS reachability from all VLANs
   nodeSelectors:
   - matchLabels:
       kubernetes.io/hostname: n5
