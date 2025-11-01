@@ -4,6 +4,9 @@ kind: IngressRoute
 metadata:
   name: pocket-id-https
   namespace: pocket-id
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: auth.jax-lab.dev
+    external-dns.alpha.kubernetes.io/target: 192.168.8.50
 spec:
   entryPoints:
     - websecure
