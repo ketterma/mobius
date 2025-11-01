@@ -54,6 +54,8 @@ spec:
             port: 8888
           initialDelaySeconds: 5
           timeoutSeconds: 5
+        securityContext:
+          runAsNonRoot: false
 
     # External-DNS configuration
     txtOwnerId: lab-cluster
@@ -61,6 +63,10 @@ spec:
     policy: sync
     logLevel: info
     interval: 1m
+
+    # Pod security context - allow webhook to run as root
+    securityContext:
+      runAsNonRoot: false
 
     # Webhook provider configuration
     extraArgs:
