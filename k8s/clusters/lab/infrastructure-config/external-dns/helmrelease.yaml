@@ -23,25 +23,10 @@ spec:
     # Use webhook provider for AdGuard Home
     provider:
       name: webhook
-
-    # External-DNS configuration
-    txtOwnerId: lab-cluster
-    txtPrefix: external-dns-
-    policy: sync
-    logLevel: info
-    interval: 1m
-
-    # Webhook provider configuration
-    extraArgs:
-      - --webhook-provider-url=http://localhost:8888
-
-    # Add webhook sidecar container
-    sidecars:
-      - name: adguard-webhook
-        image: ghcr.io/zekker6/external-dns-provider-adguard:latest
-        ports:
-          - containerPort: 8888
-            name: webhook
+      webhook:
+        image:
+          repository: ghcr.io/zekker6/external-dns-provider-adguard
+          tag: latest
         env:
           - name: ADGUARD_HOME_URL
             value: "http://adguard-home-web.adguard-home.svc.cluster.local:80/control/"
@@ -69,3 +54,14 @@ spec:
             port: 8888
           initialDelaySeconds: 5
           timeoutSeconds: 5
+
+    # External-DNS configuration
+    txtOwnerId: lab-cluster
+    txtPrefix: external-dns-
+    policy: sync
+    logLevel: info
+    interval: 1m
+
+    # Webhook provider configuration
+    extraArgs:
+      - --webhook-provider-url=http://localhost:8888
