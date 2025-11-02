@@ -5,13 +5,13 @@ metadata:
   name: unifi-controller
   namespace: unifi
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: unifi.jax-lab.dev
+    external-dns.alpha.kubernetes.io/hostname: unifi.jaxon.cloud
     external-dns.alpha.kubernetes.io/target: 192.168.8.50
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`unifi.jax-lab.dev`)
+    - match: Host(`unifi.jaxon.cloud`)
       kind: Rule
       services:
         - name: unifi-controller

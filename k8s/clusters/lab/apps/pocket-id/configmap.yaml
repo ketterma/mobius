@@ -5,5 +5,5 @@ metadata:
   name: pocket-id-config
   namespace: pocket-id
 data:
-  APP_URL: "https://auth.jax-lab.dev"
+  APP_URL: "https://auth.jaxon.cloud"
   TRUST_PROXY: "true"

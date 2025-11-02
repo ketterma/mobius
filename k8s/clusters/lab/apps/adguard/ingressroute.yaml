@@ -5,13 +5,13 @@ metadata:
   name: adguard-home
   namespace: adguard-home
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: dns.jax-lab.dev
+    external-dns.alpha.kubernetes.io/hostname: dns.jaxon.cloud
     external-dns.alpha.kubernetes.io/target: 192.168.8.50
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`dns.jax-lab.dev`)
+    - match: Host(`dns.jaxon.cloud`)
       kind: Rule
       services:
         - name: adguard-home-web
