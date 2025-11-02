@@ -71,6 +71,10 @@ spec:
         value: "http://pocket-id.pocket-id/.well-known/openid-configuration"
       - name: OAUTH_PROVIDER_NAME
         value: "Pocket ID"
+      - name: ENABLE_OAUTH_SIGNUP
+        value: "true"
+      - name: OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+        value: "true"
 
     # Ingress disabled - we'll use Traefik IngressRoute instead
     ingress:
