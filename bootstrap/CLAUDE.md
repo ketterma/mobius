@@ -95,8 +95,8 @@ ssh jax@192.168.4.5 "kubectl create namespace flux-system --dry-run=client -o ya
 ### 4. Bootstrap Flux CD
 
 ```bash
-# Set GitHub token
-export GITHUB_TOKEN=<your-github-pat>
+# Set GitHub token (if using gh CLI, it will use your authenticated token)
+export GITHUB_TOKEN=$(gh auth token)
 
 # Bootstrap Flux
 flux bootstrap github \
@@ -179,8 +179,8 @@ rm /tmp/age.agekey
 ### 3. Bootstrap Flux CD
 
 ```bash
-# Set GitHub token
-export GITHUB_TOKEN=<your-github-pat>
+# Set GitHub token (if using gh CLI, it will use your authenticated token)
+export GITHUB_TOKEN=$(gh auth token)
 
 # Switch to PHX context
 kubectl config use-context phx-jaxon-cloud

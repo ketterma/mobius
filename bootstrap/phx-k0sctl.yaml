@@ -5,19 +5,18 @@ metadata:
 spec:
   hosts:
   - role: controller+worker
-    ssh:
+    openSSH:
       address: 85.31.234.30
       user: root
       port: 22
-      keyPath: ~/.ssh/id_ed25519
+    noTaints: true
     installFlags:
       - --debug
     os: ubuntu
     privateInterface: eth0
     hostname: phx
   k0s:
-    version: 1.32.8+k0s.0
-    dynamicConfig: false
+    version: v1.32.8+k0s.0
     config:
       apiVersion: k0s.k0sproject.io/v1beta1
       kind: ClusterConfig
@@ -31,18 +30,7 @@ spec:
             - localhost
             - 127.0.0.1
         network:
-          nodeLocalLoadBalancing:
-            enabled: false
-          provider: kuberouter
-          kubeRouter:
-            autoMTU: true
-            peerRouterIPs: []
-            peerRouterASNs: []
           podCIDR: 10.244.0.0/16
           serviceCIDR: 10.96.0.0/12
-        extensions:
-          helm:
-            repositories: []
-            charts: []
         storage:
           type: kine
