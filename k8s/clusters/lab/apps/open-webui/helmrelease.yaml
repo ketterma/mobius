@@ -50,20 +50,13 @@ spec:
         memory: "2Gi"
         cpu: "2000m"
 
-    # Include Ollama for local LLM support
+    # Connect to host Ollama instead of deploying in-cluster
     ollama:
-      enabled: true
-      persistence:
-        enabled: true
-        size: 50Gi
-        storageClass: openebs-zfs-homelab
-      resources:
-        requests:
-          memory: "2Gi"
-          cpu: "500m"
-        limits:
-          memory: "8Gi"
-          cpu: "4000m"
+      enabled: false
+
+    # Point to host Ollama instance
+    ollamaUrls:
+      - http://192.168.4.5:11434
 
     # Ingress disabled - we'll use Traefik IngressRoute instead
     ingress:
