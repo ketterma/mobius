@@ -68,7 +68,7 @@ spec:
             name: open-webui-oauth
             key: OAUTH_CLIENT_SECRET
       - name: OPENID_PROVIDER_URL
-        value: "https://auth.jaxon.cloud/.well-known/openid-configuration"
+        value: "http://pocket-id.pocket-id/.well-known/openid-configuration"
       - name: OAUTH_PROVIDER_NAME
         value: "Pocket ID"
 
