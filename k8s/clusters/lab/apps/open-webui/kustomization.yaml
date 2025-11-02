@@ -7,3 +7,9 @@ resources:
   - helmrelease.yaml
   - ingressroute.yaml
   - oauth-secret.sops.yaml
+
+patches:
+  - path: statefulset-patch.yaml
+    target:
+      kind: StatefulSet
+      name: open-webui

@@ -50,12 +50,6 @@ spec:
         memory: "2Gi"
         cpu: "2000m"
 
-    # Add hostAlias for auth.jaxon.cloud to resolve to Traefik LoadBalancer
-    hostAliases:
-      - ip: "192.168.8.50"
-        hostnames:
-          - "auth.jaxon.cloud"
-
     # Connect to host Ollama instead of deploying in-cluster
     ollama:
       enabled: false

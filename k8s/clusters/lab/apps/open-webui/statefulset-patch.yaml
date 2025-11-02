@@ -1,0 +1,13 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: open-webui
+  namespace: open-webui
+spec:
+  template:
+    spec:
+      hostAliases:
+        - ip: "192.168.8.50"
+          hostnames:
+            - "auth.jaxon.cloud"
