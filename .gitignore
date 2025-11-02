@@ -3,3 +3,4 @@
 age.agekey
 *.agekey
 .sops/
+backups/

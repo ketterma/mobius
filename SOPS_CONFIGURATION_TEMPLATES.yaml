@@ -1,0 +1,534 @@
+# SOPS + Flux Configuration Templates
+# Use these as starting points for your SOPS setup
+
+---
+# ============================================================================
+# 1. BASIC .sops.yaml - Single Environment
+# ============================================================================
+# Location: .sops.yaml (repository root)
+# Purpose: Define which encryption keys to use for which files
+
+creation_rules:
+  # Match any secret files and encrypt with age
+  - path_regex: ^secrets/.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0tn45v2xtz0hpfwq98cmsg
+
+
+---
+# ============================================================================
+# 2. MULTI-ENVIRONMENT .sops.yaml
+# ============================================================================
+# Purpose: Different encryption keys for dev/staging/prod
+
+creation_rules:
+  # Development cluster
+  - path_regex: ^clusters/dev/.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1dev-key-abc123def456ghi789jkl012mno345pqr678stu9vwxyz012345
+
+  # Staging cluster
+  - path_regex: ^clusters/staging/.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1staging-key-uvw123xyz456abc789def012ghi345jkl678mno9pqr012stu345vwx
+
+  # Production cluster
+  - path_regex: ^clusters/prod/.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1prod-key-stu123vwx456yz012abc345def678ghi901jkl234mno567pqr890stu
+
+  # Fallback for any other files
+  - encrypted_regex: ^(data|stringData)$
+    age: age1default-key-fallback-here
+
+
+---
+# ============================================================================
+# 3. MULTI-USER TEAM .sops.yaml
+# ============================================================================
+# Purpose: Allow multiple team members to decrypt same secrets
+
+creation_rules:
+  - path_regex: ^secrets/.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    # All team members' public keys (comma-separated)
+    age: |
+      age1alice-key-public-here,
+      age1bob-key-public-here,
+      age1charlie-key-public-here
+
+
+---
+# ============================================================================
+# 4. KUBERNETES SECRET - Before Encryption
+# ============================================================================
+# Location: clusters/dev/secrets/database.yaml
+# Note: This is what developers create; then encrypt with: sops --encrypt --in-place
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: databases
+type: Opaque
+data:
+  host: postgres.databases.svc.cluster.local
+  port: "5432"
+  username: postgres
+  password: "your-secure-password-here"
+
+
+---
+# ============================================================================
+# 5. KUBERNETES SECRET - After SOPS Encryption
+# ============================================================================
+# This is what gets committed to Git (encrypted)
+# Flux automatically decrypts before applying
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: databases
+type: Opaque
+data:
+  host: ENC[AES256_GCM,data:bG9jYWwuY2x1c3Rlcg==,iv:qWy==,tag:abc==,type:str]
+  port: ENC[AES256_GCM,data:NTQzMg==,iv:def==,tag:ghi==,type:str]
+  username: ENC[AES256_GCM,data:cG9zdGdyZXM=,iv:jkl==,tag:mno==,type:str]
+  password: ENC[AES256_GCM,data:c2VjdXJl,iv:pqr==,tag:stu==,type:str]
+sops:
+  kms: []
+  gcp_kms: []
+  azure_kms: []
+  hc_vault: []
+  age:
+    - recipient: age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0tn45v2xtz0hpfwq98cmsg
+      enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        AgEEAg0AgFv6u+xnSmQJJfpP/9W+jkC7T4rY5JWjH9pK+tY8w6s7S9c+E=
+        -----END AGE ENCRYPTED FILE-----
+  lastmodified: "2024-01-15T10:30:00Z"
+  mac: ENC[AES256_GCM,data:qwerty==,iv:asdf==,tag:zxcv==,type:str]
+  pgp: []
+  unencrypted_suffix: _unencrypted
+  version: 3.7.3
+
+
+---
+# ============================================================================
+# 6. FLUX GITREPOSITORY - For Private Git Repo
+# ============================================================================
+# Location: infrastructure/flux-system/git-source.yaml
+
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  url: https://github.com/your-org/flux-config.git
+  ref:
+    branch: main
+  # Only needed if repository is private
+  secretRef:
+    name: flux-system
+  # Ignore patterns
+  ignore: |
+    age.agekey
+    .sops/
+    **/*.tmp
+    **/*~
+
+
+---
+# ============================================================================
+# 7. FLUX KUSTOMIZATION - With SOPS Decryption (Basic)
+# ============================================================================
+# Location: clusters/dev/kustomization.yaml
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: secrets
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  retryInterval: 1m0s
+  timeout: 5m0s
+
+  # Reference to Git source
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  # Path to encrypted secrets in repository
+  path: ./clusters/dev/secrets
+
+  # Auto-cleanup removed resources
+  prune: true
+  wait: true
+
+  # SOPS DECRYPTION CONFIGURATION
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age        # Secret with age private key
+      namespace: flux-system
+
+
+---
+# ============================================================================
+# 8. FLUX KUSTOMIZATION - Advanced with Substitutions
+# ============================================================================
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: secrets
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  retryInterval: 1m0s
+  timeout: 5m0s
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  path: ./clusters/dev/secrets
+
+  prune: true
+  wait: true
+
+  # SOPS DECRYPTION
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+      namespace: flux-system
+
+  # Variable substitution after decryption
+  postBuild:
+    substitute:
+      CLUSTER: dev
+      ENVIRONMENT: development
+      DOMAIN: dev.example.com
+      REPLICAS: "2"
+
+  # Kustomize configuration
+  patches:
+    - target:
+        kind: Deployment
+        name: ".*"
+      patch: |-
+        - op: add
+          path: /spec/replicas
+          value: ${REPLICAS}
+
+  # Validation before applying
+  validation: client
+
+
+---
+# ============================================================================
+# 9. FLUX MULTI-CLUSTER SETUP - Dev Kustomization
+# ============================================================================
+# Location: clusters/dev/kustomization.yaml
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: dev-secrets
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/dev/secrets
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age        # dev cluster's sops-age secret
+      namespace: flux-system
+
+
+---
+# ============================================================================
+# 10. FLUX MULTI-CLUSTER SETUP - Prod Kustomization
+# ============================================================================
+# Location: clusters/prod/kustomization.yaml
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prod-secrets
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/prod/secrets
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age        # prod cluster's sops-age secret
+      namespace: flux-system
+
+
+---
+# ============================================================================
+# 11. GIT CREDENTIALS SECRET - For Private Git Repository
+# ============================================================================
+# MANUAL STEP: Create this with kubectl, don't commit to Git
+
+# kubectl create secret generic flux-system \
+#   --namespace=flux-system \
+#   --from-literal=username=your-github-user \
+#   --from-literal=password=your-github-token \
+#   --dry-run=client -o yaml | kubectl apply -f -
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: flux-system
+  namespace: flux-system
+type: Opaque
+data:
+  username: eW91ci1naXRodWItdXNlcg==    # base64(your-github-user)
+  password: eW91ci1naXRodWItdG9rZW4=    # base64(your-github-token)
+
+
+---
+# ============================================================================
+# 12. SOPS-AGE SECRET - For Decryption
+# ============================================================================
+# MANUAL STEP: Create this with age private key
+
+# kubectl create secret generic sops-age \
+#   --namespace=flux-system \
+#   --from-file=age.agekey=age.agekey \
+#   --dry-run=client -o yaml | kubectl apply -f -
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sops-age
+  namespace: flux-system
+type: Opaque
+data:
+  # This is the base64-encoded age private key file
+  age.agekey: QUdFLVNFQ1JFVCBLRVktMTI3Z3c1bnFjczh...
+  # (Full base64 content omitted for brevity)
+
+
+---
+# ============================================================================
+# 13. GIT ATTRIBUTES - For Git Filter Integration (Optional)
+# ============================================================================
+# Location: .gitattributes
+# Purpose: Specify which files use SOPS encryption filter
+
+secrets/** filter=sops
+**/secrets.yaml filter=sops
+**/secrets.enc.yaml filter=sops
+clusters/*/secrets/** filter=sops
+
+
+---
+# ============================================================================
+# 14. GITIGNORE - Prevent Plaintext Secrets
+# ============================================================================
+# Location: .gitignore
+# Purpose: Never commit local age keys or plaintext secrets
+
+# SOPS and age encryption keys
+age.agekey
+sops-key.txt
+.sops/
+age-*.agekey
+
+# Local secret files
+.env.local
+.env.*.local
+secrets/*.tmp
+secrets/*.plain
+secrets/*~
+secrets/*.swp
+
+# SSH keys (if using ssh-to-age)
+.ssh/
+id_ed25519
+id_rsa
+
+# IDE temporary files
+.vscode/
+.idea/
+*.swp
+*~
+
+
+---
+# ============================================================================
+# 15. DIRECTORY STRUCTURE TEMPLATE
+# ============================================================================
+
+# Repository structure for multi-environment Flux setup:
+
+# flux-config/
+# ├── .sops.yaml                         # Root SOPS configuration
+# ├── .gitignore                         # Prevent plaintext commits
+# ├── .gitattributes                     # Git filter setup (optional)
+# ├── clusters/
+# │   ├── dev/
+# │   │   ├── .sops.yaml                # Dev-specific SOPS config (optional)
+# │   │   ├── kustomization.yaml        # Dev Kustomization with SOPS
+# │   │   ├── secrets/
+# │   │   │   ├── database.yaml         # SOPS encrypted
+# │   │   │   ├── api-keys.yaml         # SOPS encrypted
+# │   │   │   └── tls-certs.yaml        # SOPS encrypted
+# │   │   └── apps/
+# │   │       └── ...
+# │   ├── staging/
+# │   │   ├── .sops.yaml                # Staging-specific SOPS config
+# │   │   ├── kustomization.yaml
+# │   │   ├── secrets/
+# │   │   │   └── ...
+# │   │   └── apps/
+# │   │       └── ...
+# │   └── prod/
+# │       ├── .sops.yaml                # Prod-specific SOPS config
+# │       ├── kustomization.yaml
+# │       ├── secrets/
+# │       │   └── ...
+# │       └── apps/
+# │           └── ...
+# ├── infrastructure/
+# │   └── flux-system/
+# │       ├── gotk-components.yaml
+# │       ├── gotk-sync.yaml
+# │       └── kustomization.yaml
+# └── README.md
+
+
+---
+# ============================================================================
+# 16. EXAMPLE: MULTI-CLUSTER SETUP WITH DIFFERENT KEYS
+# ============================================================================
+
+# clusters/dev/.sops.yaml
+creation_rules:
+  - path_regex: ^.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1dev-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+# clusters/prod/.sops.yaml
+creation_rules:
+  - path_regex: ^.*\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1prod-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+# clusters/dev/kustomization.yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: secrets
+  namespace: flux-system
+spec:
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/dev/secrets
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age  # Dev cluster has its own sops-age secret
+
+# clusters/prod/kustomization.yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: secrets
+  namespace: flux-system
+spec:
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/prod/secrets
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age  # Prod cluster has its own sops-age secret
+
+
+---
+# ============================================================================
+# 17. HELM CHART WITH SOPS - Example
+# ============================================================================
+
+# clusters/dev/apps/my-app/kustomization.yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: my-app
+  namespace: apps
+spec:
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/dev/apps/my-app
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  # Helm release definition in this directory would reference encrypted secrets
+
+# clusters/dev/apps/my-app/helmrelease.yaml
+apiVersion: helm.toolkit.fluxcd.io/v2beta2
+kind: HelmRelease
+metadata:
+  name: my-app
+  namespace: apps
+spec:
+  chart:
+    spec:
+      chart: my-app
+      sourceRef:
+        kind: HelmRepository
+        name: my-repo
+  values:
+    # Reference encrypted secret values
+    image:
+      pullSecrets:
+        - name: docker-credentials  # Created from SOPS-encrypted Secret
+    database:
+      secretRef:
+        name: db-credentials        # Created from SOPS-encrypted Secret
+
+
+---
+# ============================================================================
+# NOTES ON USING THESE TEMPLATES
+# ============================================================================
+
+# 1. Replace placeholder age public keys with your actual keys:
+#    age1helqcqsh9464r8chnwc2fzj8uv7vr5ntnsft0tn45v2xtz0hpfwq98cmsg
+#    with output from: grep "public key:" age.agekey
+
+# 2. Update namespaces and resource names for your cluster
+
+# 3. Only create sops-age Secret in flux-system namespace on each cluster
+#    (don't commit age.agekey to Git!)
+
+# 4. Commit encrypted secrets to Git, age.agekey is for cluster only
+
+# 5. Use .sops.yaml for automatic key selection
+
+# 6. Keep age.agekey in .gitignore to prevent accidental commits
+
+# 7. Test decryption locally before deploying to cluster:
+#    sops clusters/dev/secrets/database.yaml
+
+---

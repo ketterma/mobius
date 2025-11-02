@@ -5,6 +5,7 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
 
 **Documentation:**
 - **Network Topology:** See [`docs/lab-network.md`](docs/lab-network.md) for detailed network inventory
+- **Home Assistant VM:** See [`docs/lab-vm-haos.md`](docs/lab-vm-haos.md) for VM configuration and management
 - **Repository:** Infrastructure-as-Code using GitOps (Flux CD)
 
 ## Quick Reference
@@ -42,6 +43,7 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
   - `homelab-k0sctl.yaml` - k0s cluster configuration
   - `metallb-config.yaml` - MetalLB LoadBalancer pools
   - `homelab-storageclasses.yaml` - OpenEBS ZFS StorageClasses
+  - `homeassistant-vm.xml` - Home Assistant VM libvirt definition
 - **`k8s/`** - Kubernetes manifests (Flux CD GitOps)
   - `clusters/lab/` - Homelab cluster configuration
   - `clusters/lab/flux-system/` - Flux CD system components
@@ -50,6 +52,7 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
 
 ### Documentation
 - **`docs/lab-network.md`** - Complete network topology and IP inventory
+- **`docs/lab-vm-haos.md`** - Home Assistant VM configuration and management
 - **`CLAUDE.md`** - This file (repository overview)
 
 ## Technologies
