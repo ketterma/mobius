@@ -25,6 +25,14 @@ patches:
           # DNS policy for pods using hostNetwork
           dnsPolicy: ClusterFirstWithHostNet
 
+          # Security context - allow binding to privileged ports 80/443
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+
           # ClusterIP service (not LoadBalancer or NodePort)
           service:
             type: ClusterIP
