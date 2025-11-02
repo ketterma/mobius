@@ -65,4 +65,4 @@ spec:
     # Webhook provider configuration
     extraArgs:
       - --webhook-provider-url=http://localhost:8888
-      - --traefik-disable-legacy=true
+      - --traefik-disable-legacy
