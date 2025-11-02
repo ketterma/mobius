@@ -1,0 +1,70 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: open-webui
+  namespace: open-webui
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: open-webui
+      version: '>=3.0.0 <4.0.0'
+      sourceRef:
+        kind: HelmRepository
+        name: open-webui
+        namespace: open-webui
+      interval: 15m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # Open WebUI configuration
+    image:
+      repository: ghcr.io/open-webui/open-webui
+      tag: main
+      pullPolicy: IfNotPresent
+
+    # Persistent storage for data, models, and uploads
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: openebs-zfs-homelab
+      accessModes:
+        - ReadWriteOnce
+
+    # Service configuration
+    service:
+      type: ClusterIP
+      port: 8080
+
+    # Resources - adjust as needed
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "2000m"
+
+    # Include Ollama for local LLM support
+    ollama:
+      enabled: true
+      persistence:
+        enabled: true
+        size: 50Gi
+        storageClass: openebs-zfs-homelab
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "500m"
+        limits:
+          memory: "8Gi"
+          cpu: "4000m"
+
+    # Ingress disabled - we'll use Traefik IngressRoute instead
+    ingress:
+      enabled: false
