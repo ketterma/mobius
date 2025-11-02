@@ -29,5 +29,5 @@ spec:
     remediation:
       retries: 3
   values:
-    # MetalLB values - resources created post-install via postRenderers not supported
-    # Will create IPAddressPool separately after chart installs
+    # MetalLB for cloud VPS LoadBalancer support
+    # IPAddressPool configured separately in infrastructure-config/

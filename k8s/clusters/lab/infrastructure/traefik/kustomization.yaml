@@ -1,0 +1,47 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../../base/infrastructure/traefik
+  - cloudflare-secret.sops.yaml
+
+patches:
+  # Lab cluster Traefik configuration
+  - patch: |-
+      apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      metadata:
+        name: traefik
+        namespace: flux-system
+      spec:
+        values:
+          # MetalLB LoadBalancer IP on VLAN 8
+          service:
+            annotations:
+              metallb.universe.tf/loadBalancerIPs: 192.168.8.50
+
+          # Persistent storage for Let's Encrypt certificates
+          persistence:
+            enabled: true
+            storageClass: openebs-zfs-homelab
+            size: 1Gi
+            path: /data
+
+          # Let's Encrypt DNS-01 challenge (behind NAT)
+          additionalArguments:
+            - "--certificatesresolvers.letsencrypt.acme.email=admin@jaxon.cloud"
+            - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
+            - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+            - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+            - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
+
+          # Cloudflare API token for DNS challenge
+          env:
+            - name: CF_DNS_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-api-token
+                  key: CF_DNS_API_TOKEN
+    target:
+      kind: HelmRelease
+      name: traefik

@@ -1,0 +1,48 @@
+apiVersion: k0sctl.k0sproject.io/v1beta1
+kind: Cluster
+metadata:
+  name: phx-jaxon-cloud
+spec:
+  hosts:
+  - role: controller+worker
+    ssh:
+      address: 85.31.234.30
+      user: root
+      port: 22
+      keyPath: ~/.ssh/id_ed25519
+    installFlags:
+      - --debug
+    os: ubuntu
+    privateInterface: eth0
+    hostname: phx
+  k0s:
+    version: 1.32.8+k0s.0
+    dynamicConfig: false
+    config:
+      apiVersion: k0s.k0sproject.io/v1beta1
+      kind: ClusterConfig
+      metadata:
+        name: phx-jaxon-cloud
+      spec:
+        api:
+          sans:
+            - 85.31.234.30
+            - phx.jaxon.cloud
+            - localhost
+            - 127.0.0.1
+        network:
+          nodeLocalLoadBalancing:
+            enabled: false
+          provider: kuberouter
+          kubeRouter:
+            autoMTU: true
+            peerRouterIPs: []
+            peerRouterASNs: []
+          podCIDR: 10.244.0.0/16
+          serviceCIDR: 10.96.0.0/12
+        extensions:
+          helm:
+            repositories: []
+            charts: []
+        storage:
+          type: kine

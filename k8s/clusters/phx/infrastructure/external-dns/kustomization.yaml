@@ -1,0 +1,39 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../../base/infrastructure/external-dns
+  - cloudflare-secret.sops.yaml
+
+patches:
+  # PHX cluster external-dns configuration for Cloudflare
+  - patch: |-
+      apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      metadata:
+        name: external-dns
+        namespace: external-dns
+      spec:
+        values:
+          # Use Cloudflare provider for public DNS
+          provider:
+            name: cloudflare
+
+          # Cluster identification
+          txtOwnerId: phx-cluster
+          txtPrefix: external-dns-
+
+          # Only manage jaxon.cloud domain
+          domainFilters:
+            - jaxon.cloud
+
+          # Cloudflare API token
+          env:
+            - name: CF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-api-token
+                  key: CF_API_TOKEN
+    target:
+      kind: HelmRelease
+      name: external-dns

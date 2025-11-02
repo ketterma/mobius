@@ -1,0 +1,45 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: traefik
+      version: 37.2.x
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: flux-system
+  targetNamespace: traefik
+  install:
+    remediation:
+      retries: 3
+  values:
+    # Base Traefik configuration
+    # Clusters will override via patches for:
+    # - service.annotations (MetalLB IP)
+    # - persistence settings
+    # - certificatesresolvers (HTTP-01 vs DNS-01)
+    # - env variables (Cloudflare token for DNS-01)
+
+    service:
+      type: LoadBalancer
+
+    # Enable IngressRoute CRD
+    ingressRoute:
+      dashboard:
+        enabled: false
+
+    # Allow ExternalName services
+    providers:
+      kubernetesCRD:
+        allowExternalNameServices: true
+
+    # Security context
+    podSecurityContext:
+      fsGroup: 65532
+      fsGroupChangePolicy: "OnRootMismatch"

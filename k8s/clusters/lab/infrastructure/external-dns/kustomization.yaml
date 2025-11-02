@@ -1,0 +1,63 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../../base/infrastructure/external-dns
+  - adguard-secret.sops.yaml
+
+patches:
+  # Lab cluster external-dns configuration for AdGuard Home
+  - patch: |-
+      apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      metadata:
+        name: external-dns
+        namespace: external-dns
+      spec:
+        values:
+          # Use webhook provider for AdGuard Home
+          provider:
+            name: webhook
+            webhook:
+              image:
+                repository: ghcr.io/muhlba91/external-dns-provider-adguard
+                tag: v9.1.0
+              env:
+                - name: ADGUARD_URL
+                  value: "http://adguard-home-web.adguard-home.svc.cluster.local:80"
+                - name: ADGUARD_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: adguard-credentials
+                      key: ADGUARD_HOME_USER
+                - name: ADGUARD_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: adguard-credentials
+                      key: ADGUARD_HOME_PASS
+                - name: LOG_LEVEL
+                  value: "info"
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8080
+                initialDelaySeconds: 10
+                timeoutSeconds: 5
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8080
+                initialDelaySeconds: 10
+                timeoutSeconds: 5
+
+          # Cluster identification
+          txtOwnerId: lab-cluster
+          txtPrefix: external-dns-
+
+          # Webhook provider configuration
+          extraArgs:
+            - --webhook-provider-url=http://localhost:8888
+            - --traefik-disable-legacy
+    target:
+      kind: HelmRelease
+      name: external-dns

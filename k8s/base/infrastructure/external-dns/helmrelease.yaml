@@ -1,0 +1,34 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: external-dns
+      version: "1.15.x"
+      sourceRef:
+        kind: HelmRepository
+        name: external-dns
+        namespace: external-dns
+      interval: 12h
+  values:
+    # Base external-dns configuration
+    # Clusters will override provider and provider-specific config
+
+    # Watch Traefik IngressRoute resources
+    sources:
+      - traefik-proxy
+
+    policy: sync
+    logLevel: info
+    interval: 1m
+
+    # Cluster-specific overrides needed:
+    # - provider (webhook for AdGuard, cloudflare for Cloudflare)
+    # - txtOwnerId (lab-cluster vs phx-cluster)
+    # - txtPrefix
+    # - env variables / secrets
