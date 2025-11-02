@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - metallb-config.yaml
   - twingate
+  - coredns-configmap.yaml
