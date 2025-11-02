@@ -23,6 +23,8 @@ kind: IngressRoute
 metadata:
   name: whoami-https
   namespace: whoami
+  annotations:
+    external-dns.alpha.kubernetes.io/target: 85.31.234.30
 spec:
   entryPoints:
     - websecure
