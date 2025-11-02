@@ -29,6 +29,14 @@ patches:
           service:
             type: ClusterIP
 
+          # Move dashboard to port 9000 to avoid kube-router conflict on 8080
+          ports:
+            traefik:
+              port: 9000
+              expose:
+                default: true
+              exposedPort: 9000
+
           # Persistent storage for Let's Encrypt certificates
           persistence:
             enabled: true
