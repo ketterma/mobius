@@ -1,5 +1,5 @@
 ---
-# HTTP IngressRoute - redirects to HTTPS
+# HTTP IngressRoute - redirects to HTTPS (except ACME challenges)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -9,6 +9,11 @@ spec:
   entryPoints:
     - web
   routes:
+    - match: Host(`whoami.phx.jaxon.cloud`) && PathPrefix(`/.well-known/acme-challenge/`)
+      kind: Rule
+      services:
+        - name: whoami
+          port: 80
     - match: Host(`whoami.phx.jaxon.cloud`)
       kind: Rule
       services:
