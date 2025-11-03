@@ -34,19 +34,3 @@ spec:
           serviceCIDR: 10.96.0.0/12
         storage:
           type: kine
-        extensions:
-          helm:
-            repositories:
-              - name: local-path-provisioner
-                url: https://github.com/rancher/local-path-provisioner
-            charts:
-              - name: local-path-provisioner
-                chartname: local-path-provisioner/local-path-provisioner
-                version: "0.0.32"
-                namespace: local-path-provisioner
-                order: 1
-                values: |
-                  storageClass:
-                    create: true
-                    name: local-path
-                    defaultClass: true

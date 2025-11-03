@@ -1,0 +1,10 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: local-path-provisioner
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: https://github.com/rancher/local-path-provisioner/releases/download/v0.0.30
+  type: oci
