@@ -1,0 +1,253 @@
+name: Kubernetes Manifest Validation
+
+on:
+  pull_request:
+    paths:
+      - 'k8s/**/*.yaml'
+      - 'k8s/**/*.yml'
+      - 'bootstrap/**/*.yaml'
+      - 'bootstrap/**/*.yml'
+      - '.github/workflows/k8s-validate.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'k8s/**/*.yaml'
+      - 'k8s/**/*.yml'
+      - 'bootstrap/**/*.yaml'
+      - 'bootstrap/**/*.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          # Install kubeconform for k8s schema validation
+          KUBECONFORM_VERSION=0.6.4
+          wget -q https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+          # Install kustomize for kustomize build validation
+          KUSTOMIZE_VERSION=5.3.0
+          wget -q https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          tar xzf kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          sudo mv kustomize /usr/local/bin/
+
+          # Install Flux CLI for flux-specific validation
+          curl -s https://fluxcd.io/install.sh | sudo bash
+
+          # Install yamllint for YAML syntax validation
+          sudo apt-get update && sudo apt-get install -y yamllint
+
+      - name: Validate YAML syntax
+        run: |
+          echo "::group::YAML Syntax Validation"
+
+          # Create yamllint config that only catches real syntax errors
+          # We're lenient on style since many files are auto-generated or encrypted
+          cat > .yamllint.yaml <<EOF
+          extends: relaxed
+          rules:
+            line-length: disable
+            indentation: disable
+            comments: disable
+            comments-indentation: disable
+            document-start: disable
+            truthy:
+              allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+              check-keys: false
+          ignore: |
+            k8s/**/gotk-components.yaml
+            k8s/**/gotk-sync.yaml
+          EOF
+
+          # Validate all YAML files - only catch actual syntax errors
+          if ! yamllint -c .yamllint.yaml k8s/ bootstrap/; then
+            echo "::error::YAML syntax validation failed - files contain invalid YAML syntax"
+            exit 1
+          fi
+
+          echo "✅ YAML syntax validation passed"
+          echo "::endgroup::"
+
+      - name: Validate Kustomize builds and Kubernetes schemas
+        run: |
+          echo "::group::Kustomize Build & Schema Validation"
+
+          # Find all kustomization.yaml files and validate their built output
+          find k8s -name "kustomization.yaml" | while read kustomization; do
+            dir=$(dirname "$kustomization")
+            echo ""
+            echo "=========================================="
+            echo "Building and validating: $dir"
+            echo "=========================================="
+
+            # Build the kustomization
+            if ! kustomize build "$dir" > /tmp/kustomize-output.yaml 2>/tmp/kustomize-error.log; then
+              echo "::error file=${kustomization}::Failed to build kustomization in $dir"
+              echo "Build error:"
+              cat /tmp/kustomize-error.log | head -20
+              exit 1
+            fi
+
+            # Validate the built output with kubeconform
+            # This validates what will actually be applied to the cluster
+            if ! kubeconform \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -summary \
+              -ignore-missing-schemas \
+              -skip HelmRelease,Kustomization,HelmRepository,GitRepository \
+              /tmp/kustomize-output.yaml; then
+              echo "::error file=${kustomization}::Schema validation failed for kustomization in $dir"
+              exit 1
+            fi
+
+            echo "✅ Successfully built and validated: $dir"
+          done
+
+          # Clean up
+          rm -f /tmp/kustomize-output.yaml /tmp/kustomize-error.log
+
+          echo ""
+          echo "✅ All kustomizations built and validated successfully"
+          echo "::endgroup::"
+
+      - name: Validate Flux resources
+        run: |
+          echo "::group::Flux Resource Validation"
+
+          # Validate the main flux-system kustomization
+          if [ -d "k8s/clusters/lab/flux-system" ]; then
+            echo "Validating Flux system resources..."
+            flux install --export > /tmp/flux-install.yaml
+
+            # Build the flux-system kustomization and validate
+            if ! kustomize build k8s/clusters/lab/flux-system > /tmp/flux-system.yaml; then
+              echo "::error::Failed to build flux-system kustomization"
+              kustomize build k8s/clusters/lab/flux-system 2>&1 | head -20
+              exit 1
+            fi
+          fi
+
+          # Find and validate all Flux Kustomization resources
+          find k8s -name "*.yaml" ! -name "*.sops.yaml" ! -name "gotk-*.yaml" | \
+            xargs grep -l "kind: Kustomization" 2>/dev/null | \
+            while read file; do
+              echo "Validating Flux Kustomization: $file"
+              # Basic validation - ensure it has required fields
+              if ! grep -q "apiVersion: kustomize.toolkit.fluxcd.io" "$file"; then
+                continue  # Skip non-Flux kustomizations
+              fi
+
+              if ! grep -q "spec:" "$file" || ! grep -q "sourceRef:" "$file"; then
+                echo "::error file=${file}::Invalid Flux Kustomization - missing required fields"
+                exit 1
+              fi
+            done
+
+          echo "✅ Flux resource validation passed"
+          echo "::endgroup::"
+
+      - name: Check for common issues
+        continue-on-error: true
+        run: |
+          echo "::group::Additional Checks"
+
+          # Check for common mistakes (non-blocking)
+          ISSUES=0
+
+          # Check for hardcoded passwords or secrets (excluding SOPS files)
+          echo "Checking for potential hardcoded secrets..."
+          if find k8s -name "*.yaml" ! -name "*.sops.yaml" -exec grep -l "password:" {} \; 2>/dev/null | \
+             xargs grep -i "password:" 2>/dev/null | \
+             grep -v "passwordHash:" | \
+             grep -v "name: .*password" | \
+             grep -q .; then
+            echo "::warning::Found potential hardcoded passwords. Consider using SOPS encryption."
+            ISSUES=$((ISSUES + 1))
+          fi
+
+          # Check for missing namespaces in non-cluster-scoped resources
+          echo "Checking for resources without namespace..."
+          if [ -d "k8s/clusters/lab/apps" ]; then
+            find k8s/clusters/lab/apps -name "*.yaml" ! -name "kustomization.yaml" ! -name "namespace.yaml" ! -name "*.sops.yaml" 2>/dev/null | \
+               while read file; do
+                 if grep -q "kind: Deployment\|kind: Service\|kind: ConfigMap\|kind: Secret\|kind: Ingress\|kind: PersistentVolumeClaim" "$file"; then
+                   if ! grep -q "namespace:" "$file"; then
+                     echo "::warning file=${file}::Resource may be missing namespace declaration"
+                     ISSUES=$((ISSUES + 1))
+                   fi
+                 fi
+               done
+          fi
+
+          # Check for duplicate resource names (simplified)
+          echo "Checking for duplicate resource names..."
+          TEMP_FILE=$(mktemp)
+          find k8s -name "*.yaml" ! -name "kustomization.yaml" ! -name "*.sops.yaml" 2>/dev/null | \
+            while read file; do
+              dir=$(dirname "$file")
+              name=$(grep "^  name:" "$file" 2>/dev/null | head -1 | sed 's/.*name: //' | tr -d ' ')
+              kind=$(grep "^kind:" "$file" 2>/dev/null | head -1 | sed 's/.*kind: //' | tr -d ' ')
+              if [ -n "$name" ] && [ -n "$kind" ]; then
+                echo "$dir|$kind|$name|$file" >> "$TEMP_FILE"
+              fi
+            done
+
+          if [ -f "$TEMP_FILE" ]; then
+            sort "$TEMP_FILE" | uniq -c | while read count entry; do
+              if [ "$count" -gt 1 ]; then
+                echo "::warning::Potential duplicate resource: $entry (found $count times)"
+                ISSUES=$((ISSUES + 1))
+              fi
+            done
+            rm -f "$TEMP_FILE"
+          fi
+
+          if [ $ISSUES -gt 0 ]; then
+            echo "::notice::Found $ISSUES potential issues (non-blocking)"
+          else
+            echo "✅ No common issues found"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "## ✅ Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Kubernetes manifest validations passed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ YAML syntax validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Kustomize builds & Kubernetes schema validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Flux resource validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Additional checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Validation checks the actual output of \`kustomize build\` to ensure" >> $GITHUB_STEP_SUMMARY
+          echo "manifests conform to Kubernetes schemas after all patches and overlays are applied." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your manifests are ready to merge! 🎉" >> $GITHUB_STEP_SUMMARY
+
+      - name: Failure Summary
+        if: failure()
+        run: |
+          echo "## ❌ Validation Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "One or more validation steps failed. Please check the logs above for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Common issues:" >> $GITHUB_STEP_SUMMARY
+          echo "- Invalid YAML syntax" >> $GITHUB_STEP_SUMMARY
+          echo "- Kustomize build errors (missing resources, incorrect paths, bad patches)" >> $GITHUB_STEP_SUMMARY
+          echo "- Built manifests not conforming to Kubernetes API schemas" >> $GITHUB_STEP_SUMMARY
+          echo "- Invalid Flux resource definitions" >> $GITHUB_STEP_SUMMARY
