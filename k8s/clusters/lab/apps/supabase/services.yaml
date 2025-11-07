@@ -1,0 +1,36 @@
+---
+# LoadBalancer service for Supabase API (aggregates REST, Realtime, Storage)
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-api
+  namespace: supabase
+  annotations:
+    metallb.universe.tf/address-pool: l2-vlan8
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: supabase-rest
+    app.kubernetes.io/instance: supabase
+---
+# ClusterIP service for Studio
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-studio-public
+  namespace: supabase
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: supabase-studio
+    app.kubernetes.io/instance: supabase

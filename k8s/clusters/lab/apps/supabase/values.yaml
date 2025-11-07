@@ -1,0 +1,295 @@
+# Supabase Helm Chart Values
+# Homelab deployment with auth disabled
+
+# Use existing secret for all credentials
+secret:
+  jwt:
+    secretRef: supabase-secrets
+    secretRefKey:
+      anonKey: anon-key
+      serviceKey: service-key
+      secret: jwt-secret
+  db:
+    secretRef: supabase-secrets
+    secretRefKey:
+      username: db-username
+      password: db-password
+      database: db-database
+  dashboard:
+    secretRef: supabase-secrets
+    secretRefKey:
+      username: dashboard-username
+      password: dashboard-password
+  analytics:
+    secretRef: supabase-secrets
+    secretRefKey:
+      apiKey: analytics-api-key
+
+# PostgreSQL Database
+db:
+  enabled: true
+  image:
+    repository: supabase/postgres
+    tag: 15.1.0.147
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  livenessProbe:
+    exec:
+      command:
+        - pg_isready
+        - -U
+        - postgres
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    exec:
+      command:
+        - pg_isready
+        - -U
+        - postgres
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  persistence:
+    enabled: true
+    storageClassName: openebs-zfs-homelab
+    size: 100Gi
+    accessModes:
+      - ReadWriteOnce
+  autoscaling:
+    enabled: false
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Studio (Database Dashboard)
+studio:
+  enabled: true
+  image:
+    repository: supabase/studio
+    tag: 20240326-5e5586d
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  environment:
+    STUDIO_DEFAULT_ORGANIZATION: "Homelab"
+    STUDIO_DEFAULT_PROJECT: "Supabase"
+    SUPABASE_PUBLIC_URL: https://api.supabase.jax-lab.dev
+    NEXT_PUBLIC_ENABLE_LOGS: "true"
+  livenessProbe:
+    httpGet:
+      path: /api/profile
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /api/profile
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+
+# Auth (GoTrue) - DISABLED
+auth:
+  enabled: false
+
+# REST API (PostgREST)
+rest:
+  enabled: true
+  image:
+    repository: postgrest/postgrest
+    tag: v12.0.1
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+
+# Realtime
+realtime:
+  enabled: true
+  image:
+    repository: supabase/realtime
+    tag: v2.27.5
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 4000
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 4000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: false
+
+# Meta (Database metadata service)
+meta:
+  enabled: true
+  image:
+    repository: supabase/postgres-meta
+    tag: v0.80.0
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+# Storage
+storage:
+  enabled: true
+  image:
+    repository: supabase/storage-api
+    tag: v0.46.4
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  environment:
+    # Use file backend instead of S3
+    STORAGE_BACKEND: file
+    FILE_SIZE_LIMIT: "52428800"  # 50MB
+    FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+  livenessProbe:
+    httpGet:
+      path: /status
+      port: 5000
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    httpGet:
+      path: /status
+      port: 5000
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  persistence:
+    enabled: true
+    storageClassName: openebs-zfs-homelab
+    size: 50Gi
+    accessModes:
+      - ReadWriteOnce
+  autoscaling:
+    enabled: false
+
+# Image Proxy
+imgproxy:
+  enabled: true
+  image:
+    repository: darthsim/imgproxy
+    tag: v3.8.0
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  environment:
+    IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+  livenessProbe:
+    exec:
+      command:
+        - imgproxy
+        - health
+    initialDelaySeconds: 30
+    periodSeconds: 30
+  readinessProbe:
+    exec:
+      command:
+        - imgproxy
+        - health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  persistence:
+    enabled: false
+  autoscaling:
+    enabled: false
+
+# Kong API Gateway - Disabled (using Traefik instead)
+kong:
+  enabled: false
+
+# Analytics - Disabled for now
+analytics:
+  enabled: false
+
+# Vector - Disabled for now
+vector:
+  enabled: false
+
+# Edge Functions - Disabled for now
+functions:
+  enabled: false
+
+# MinIO - Disabled (using file storage)
+minio:
+  enabled: false
