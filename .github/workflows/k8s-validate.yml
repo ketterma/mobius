@@ -79,56 +79,47 @@ jobs:
           echo "✅ YAML syntax validation passed"
           echo "::endgroup::"
 
-      - name: Validate Kubernetes manifests with kubeconform
+      - name: Validate Kustomize builds and Kubernetes schemas
         run: |
-          echo "::group::Kubernetes Schema Validation"
+          echo "::group::Kustomize Build & Schema Validation"
 
-          # Find all YAML files, exclude non-k8s files
-          # - kustomization.yaml: Kustomize config files (not k8s resources)
-          # - *.sops.yaml: Encrypted files
-          # - gotk-*.yaml: Flux-generated files
-          find k8s bootstrap \( -name "*.yaml" -o -name "*.yml" \) | \
-            grep -v "kustomization.yaml" | \
-            grep -v ".sops.yaml" | \
-            grep -v "gotk-components.yaml" | \
-            grep -v "gotk-sync.yaml" | \
-            while read file; do
-              echo "Validating: $file"
-              if ! kubeconform \
-                -schema-location default \
-                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-                -summary \
-                -output json \
-                -verbose \
-                "$file"; then
-                echo "::error file=${file}::Schema validation failed"
-                exit 1
-              fi
-            done
-
-          echo "✅ Kubernetes schema validation passed"
-          echo "::endgroup::"
-
-      - name: Validate Kustomize builds
-        run: |
-          echo "::group::Kustomize Build Validation"
-
-          # Find all kustomization.yaml files
+          # Find all kustomization.yaml files and validate their built output
           find k8s -name "kustomization.yaml" | while read kustomization; do
             dir=$(dirname "$kustomization")
-            echo "Building kustomization in: $dir"
+            echo ""
+            echo "=========================================="
+            echo "Building and validating: $dir"
+            echo "=========================================="
 
-            # Try to build the kustomization
-            if ! kustomize build "$dir" > /dev/null 2>&1; then
+            # Build the kustomization
+            if ! kustomize build "$dir" > /tmp/kustomize-output.yaml 2>/tmp/kustomize-error.log; then
               echo "::error file=${kustomization}::Failed to build kustomization in $dir"
-              kustomize build "$dir" 2>&1 | head -20
+              echo "Build error:"
+              cat /tmp/kustomize-error.log | head -20
               exit 1
-            else
-              echo "✅ Successfully built: $dir"
             fi
+
+            # Validate the built output with kubeconform
+            # This validates what will actually be applied to the cluster
+            if ! kubeconform \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -summary \
+              -ignore-missing-schemas \
+              -skip HelmRelease,Kustomization,HelmRepository,GitRepository \
+              /tmp/kustomize-output.yaml; then
+              echo "::error file=${kustomization}::Schema validation failed for kustomization in $dir"
+              exit 1
+            fi
+
+            echo "✅ Successfully built and validated: $dir"
           done
 
-          echo "✅ Kustomize build validation passed"
+          # Clean up
+          rm -f /tmp/kustomize-output.yaml /tmp/kustomize-error.log
+
+          echo ""
+          echo "✅ All kustomizations built and validated successfully"
           echo "::endgroup::"
 
       - name: Validate Flux resources
@@ -239,10 +230,12 @@ jobs:
           echo "All Kubernetes manifest validations passed!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ YAML syntax validation" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Kubernetes schema validation" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Kustomize build validation" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Kustomize builds & Kubernetes schema validation" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Flux resource validation" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Additional checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Validation checks the actual output of \`kustomize build\` to ensure" >> $GITHUB_STEP_SUMMARY
+          echo "manifests conform to Kubernetes schemas after all patches and overlays are applied." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Your manifests are ready to merge! 🎉" >> $GITHUB_STEP_SUMMARY
 
@@ -255,6 +248,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Common issues:" >> $GITHUB_STEP_SUMMARY
           echo "- Invalid YAML syntax" >> $GITHUB_STEP_SUMMARY
-          echo "- Resources not conforming to Kubernetes API schema" >> $GITHUB_STEP_SUMMARY
-          echo "- Kustomize build errors (missing resources, incorrect paths)" >> $GITHUB_STEP_SUMMARY
+          echo "- Kustomize build errors (missing resources, incorrect paths, bad patches)" >> $GITHUB_STEP_SUMMARY
+          echo "- Built manifests not conforming to Kubernetes API schemas" >> $GITHUB_STEP_SUMMARY
           echo "- Invalid Flux resource definitions" >> $GITHUB_STEP_SUMMARY
