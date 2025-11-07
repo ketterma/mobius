@@ -6,5 +6,3 @@ resources:
   - adguard
   - pocket-id
   - unifi
-  - open-webui
-  - supabase
