@@ -26,6 +26,3 @@ spec:
     - kind: ConfigMap
       name: supabase-values
       valuesKey: values.yaml
-  dependsOn:
-    - name: metallb
-      namespace: metallb-system
