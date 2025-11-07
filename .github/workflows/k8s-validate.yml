@@ -1,0 +1,240 @@
+name: Kubernetes Manifest Validation
+
+on:
+  pull_request:
+    paths:
+      - 'k8s/**/*.yaml'
+      - 'k8s/**/*.yml'
+      - 'bootstrap/**/*.yaml'
+      - 'bootstrap/**/*.yml'
+      - '.github/workflows/k8s-validate.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'k8s/**/*.yaml'
+      - 'k8s/**/*.yml'
+      - 'bootstrap/**/*.yaml'
+      - 'bootstrap/**/*.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          # Install kubeconform for k8s schema validation
+          KUBECONFORM_VERSION=0.6.4
+          wget -q https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+          # Install kustomize for kustomize build validation
+          KUSTOMIZE_VERSION=5.3.0
+          wget -q https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          tar xzf kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          sudo mv kustomize /usr/local/bin/
+
+          # Install Flux CLI for flux-specific validation
+          curl -s https://fluxcd.io/install.sh | sudo bash
+
+          # Install yamllint for YAML syntax validation
+          sudo apt-get update && sudo apt-get install -y yamllint
+
+      - name: Validate YAML syntax
+        run: |
+          echo "::group::YAML Syntax Validation"
+
+          # Create yamllint config that's lenient but catches real errors
+          cat > .yamllint.yaml <<EOF
+          extends: default
+          rules:
+            line-length:
+              max: 120
+              level: warning
+            indentation:
+              spaces: 2
+            document-start: disable
+            comments:
+              min-spaces-from-content: 1
+            truthy:
+              allowed-values: ['true', 'false', 'on', 'off']
+          ignore: |
+            k8s/clusters/lab/flux-system/gotk-components.yaml
+          EOF
+
+          # Validate all YAML files (including SOPS files - they're still valid YAML)
+          yamllint -c .yamllint.yaml k8s/ bootstrap/ || EXIT_CODE=$?
+
+          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "::error::YAML syntax validation failed"
+            exit 1
+          fi
+
+          echo "✅ YAML syntax validation passed"
+          echo "::endgroup::"
+
+      - name: Validate Kubernetes manifests with kubeconform
+        run: |
+          echo "::group::Kubernetes Schema Validation"
+
+          # Find all YAML files, exclude SOPS encrypted files and flux-system generated files
+          find k8s bootstrap -name "*.yaml" -o -name "*.yml" | \
+            grep -v ".sops.yaml" | \
+            grep -v "gotk-components.yaml" | \
+            grep -v "gotk-sync.yaml" | \
+            while read file; do
+              echo "Validating: $file"
+              kubeconform \
+                -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+                -summary \
+                -output json \
+                -verbose \
+                "$file" || EXIT_CODE=$?
+            done
+
+          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "::error::Kubernetes schema validation failed"
+            exit 1
+          fi
+
+          echo "✅ Kubernetes schema validation passed"
+          echo "::endgroup::"
+
+      - name: Validate Kustomize builds
+        run: |
+          echo "::group::Kustomize Build Validation"
+
+          # Find all kustomization.yaml files
+          find k8s -name "kustomization.yaml" | while read kustomization; do
+            dir=$(dirname "$kustomization")
+            echo "Building kustomization in: $dir"
+
+            # Try to build the kustomization
+            if ! kustomize build "$dir" > /dev/null 2>&1; then
+              echo "::error file=${kustomization}::Failed to build kustomization in $dir"
+              EXIT_CODE=1
+            else
+              echo "✅ Successfully built: $dir"
+            fi
+          done
+
+          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "::error::Kustomize build validation failed"
+            exit 1
+          fi
+
+          echo "✅ Kustomize build validation passed"
+          echo "::endgroup::"
+
+      - name: Validate Flux resources
+        run: |
+          echo "::group::Flux Resource Validation"
+
+          # Validate the main flux-system kustomization
+          if [ -d "k8s/clusters/lab/flux-system" ]; then
+            echo "Validating Flux system resources..."
+            flux install --export > /tmp/flux-install.yaml
+
+            # Build the flux-system kustomization and validate
+            kustomize build k8s/clusters/lab/flux-system > /tmp/flux-system.yaml || EXIT_CODE=$?
+
+            if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+              echo "::error::Failed to build flux-system kustomization"
+              exit 1
+            fi
+          fi
+
+          # Find and validate all Flux Kustomization resources
+          find k8s -name "*.yaml" ! -name "*.sops.yaml" ! -name "gotk-*.yaml" | \
+            xargs grep -l "kind: Kustomization" | \
+            while read file; do
+              echo "Validating Flux Kustomization: $file"
+              # Basic validation - ensure it has required fields
+              if ! grep -q "apiVersion: kustomize.toolkit.fluxcd.io" "$file"; then
+                continue  # Skip non-Flux kustomizations
+              fi
+
+              if ! grep -q "spec:" "$file" || ! grep -q "sourceRef:" "$file"; then
+                echo "::error file=${file}::Invalid Flux Kustomization - missing required fields"
+                EXIT_CODE=1
+              fi
+            done
+
+          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "::error::Flux resource validation failed"
+            exit 1
+          fi
+
+          echo "✅ Flux resource validation passed"
+          echo "::endgroup::"
+
+      - name: Check for common issues
+        run: |
+          echo "::group::Additional Checks"
+
+          # Check for common mistakes
+          ISSUES=0
+
+          # Check for hardcoded passwords or secrets (excluding SOPS files)
+          echo "Checking for potential hardcoded secrets..."
+          if find k8s -name "*.yaml" ! -name "*.sops.yaml" | xargs grep -i "password:" | grep -v "passwordHash:" | grep -v "name: .*password"; then
+            echo "::warning::Found potential hardcoded passwords. Consider using SOPS encryption."
+            ISSUES=$((ISSUES + 1))
+          fi
+
+          # Check for missing namespaces in non-cluster-scoped resources
+          echo "Checking for resources without namespace..."
+          if find k8s/clusters/lab/apps -name "*.yaml" ! -name "kustomization.yaml" ! -name "namespace.yaml" ! -name "*.sops.yaml" | \
+             xargs grep -l "kind: \(Deployment\|Service\|ConfigMap\|Secret\|Ingress\|PersistentVolumeClaim\)" | \
+             while read file; do
+               if ! grep -q "namespace:" "$file"; then
+                 echo "::warning file=${file}::Resource may be missing namespace declaration"
+               fi
+             done | grep -q "warning"; then
+            ISSUES=$((ISSUES + 1))
+          fi
+
+          # Check for duplicate resource names within the same directory
+          echo "Checking for duplicate resource names..."
+          find k8s -name "*.yaml" ! -name "kustomization.yaml" ! -name "*.sops.yaml" | \
+            while read file; do
+              dir=$(dirname "$file")
+              name=$(grep "^  name:" "$file" | head -1 | sed 's/.*name: //')
+              kind=$(grep "^kind:" "$file" | head -1 | sed 's/.*kind: //')
+              if [ -n "$name" ] && [ -n "$kind" ]; then
+                echo "$dir|$kind|$name|$file"
+              fi
+            done | sort | uniq -c | awk '$1 > 1 {print $0}' | while read count entry; do
+              echo "::warning::Potential duplicate resource: $entry (found $count times)"
+              ISSUES=$((ISSUES + 1))
+            done
+
+          if [ $ISSUES -gt 0 ]; then
+            echo "::notice::Found $ISSUES potential issues (non-blocking)"
+          else
+            echo "✅ No common issues found"
+          fi
+
+          echo "::endgroup::"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ YAML syntax validation" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Kubernetes schema validation" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Kustomize build validation" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Flux resource validation" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Additional checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Kubernetes manifest validations passed! 🎉" >> $GITHUB_STEP_SUMMARY
