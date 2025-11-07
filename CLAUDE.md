@@ -166,6 +166,33 @@ ssh root@cloud.jax-lab.dev # VPS
 
 ## Recent Changes
 
+### 2025-11-07: Data Recovery & Clean Slate Recovery
+- ✅ Recovered from accidental deletion of apps kustomization (which garbage collected all apps)
+- ✅ Created ZFS snapshots before recovery (`pre-flux-restore-20251107-001809`)
+- ✅ Backed up AdGuard and Pocket-ID data to `/home/jax/homelab-backups/20251107-005754/`
+- ✅ Cleaned up all manual PV/PVC manifests and orphaned ZFS datasets
+- ✅ Let apps redeploy with fresh dynamic PVC provisioning
+- ✅ Successfully restored data from backups
+- ✅ Removed Open-WebUI and Supabase (not needed)
+
+**Critical lessons learned:**
+1. **NEVER delete Flux kustomizations without understanding garbage collection** - Flux will delete ALL managed resources when a kustomization is removed
+2. **Always create ZFS snapshots BEFORE any destructive operations** - Snapshots saved us from total data loss
+3. **Always create file-based backups in addition to snapshots** - Tar backups to `/home/jax/homelab-backups/` for easy restoration
+4. **Verify volume mappings carefully** - Check actual file contents, not just sizes, when mapping PVCs to existing volumes
+5. **Don't rush destructive commands** - Take time to verify what will be affected before deleting PVs, PVCs, or ZFS datasets
+6. **PV reclaim policy matters** - Set to `Retain` during recovery to prevent accidental data loss
+7. **Flux can get stuck on old revisions** - Sometimes need to delete and recreate kustomizations to force new revision
+8. **OpenEBS ZFS uses UUID naming** - Cannot customize dataset names for dynamically provisioned volumes (use `pvc-{uuid}`)
+9. **Home Assistant needs external DNS names** - Not Kubernetes service names for OAuth providers
+
+**Recovery checklist for future incidents:**
+1. Immediately suspend Flux: `flux suspend kustomization apps`
+2. Create ZFS snapshots: `sudo zfs snapshot -r vms/homelab@emergency-$(date +%Y%m%d-%H%M%S)`
+3. Create file backups of critical data to `/home/jax/homelab-backups/`
+4. Change PV reclaim policy to Retain: `kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'`
+5. Never delete datasets until you're 100% sure they're not needed
+
 ### 2025-11-01: VLAN Migration & Routing Fix
 - ✅ Migrated from single-VLAN (192.168.8.x) to multi-VLAN architecture
 - ✅ Fixed MetalLB routing by adding IP addresses to VLAN interfaces
