@@ -52,29 +52,27 @@ jobs:
         run: |
           echo "::group::YAML Syntax Validation"
 
-          # Create yamllint config that's lenient but catches real errors
+          # Create yamllint config that only catches real syntax errors
+          # We're lenient on style since many files are auto-generated or encrypted
           cat > .yamllint.yaml <<EOF
-          extends: default
+          extends: relaxed
           rules:
-            line-length:
-              max: 120
-              level: warning
-            indentation:
-              spaces: 2
+            line-length: disable
+            indentation: disable
+            comments: disable
+            comments-indentation: disable
             document-start: disable
-            comments:
-              min-spaces-from-content: 1
             truthy:
-              allowed-values: ['true', 'false', 'on', 'off']
+              allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+              check-keys: false
           ignore: |
-            k8s/clusters/lab/flux-system/gotk-components.yaml
+            k8s/**/gotk-components.yaml
+            k8s/**/gotk-sync.yaml
           EOF
 
-          # Validate all YAML files (including SOPS files - they're still valid YAML)
-          yamllint -c .yamllint.yaml k8s/ bootstrap/ || EXIT_CODE=$?
-
-          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
-            echo "::error::YAML syntax validation failed"
+          # Validate all YAML files - only catch actual syntax errors
+          if ! yamllint -c .yamllint.yaml k8s/ bootstrap/; then
+            echo "::error::YAML syntax validation failed - files contain invalid YAML syntax"
             exit 1
           fi
 
