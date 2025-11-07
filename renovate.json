@@ -1,0 +1,148 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":preserveSemverRanges"
+  ],
+  "timezone": "America/Phoenix",
+  "schedule": [
+    "after 10pm every weekday",
+    "before 5am every weekday",
+    "every weekend"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "assignees": [
+    "@ketterma"
+  ],
+  "reviewers": [
+    "@ketterma"
+  ],
+  "prConcurrentLimit": 5,
+  "branchConcurrentLimit": 5,
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{#if isPinDigest}}{{{newDigestShort}}}{{else}}{{#if isMajor}}{{prettyNewMajor}}{{else}}{{#if isSingleVersion}}{{prettyNewVersion}}{{else}}{{#if newValue}}{{{newValue}}}{{else}}{{{newDigestShort}}}{{/if}}{{/if}}{{/if}}{{/if}}",
+  "packageRules": [
+    {
+      "description": "Auto-merge patch and minor updates",
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true
+    },
+    {
+      "description": "Group all Flux CD components",
+      "groupName": "Flux CD",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackagePatterns": [
+        "^ghcr\\.io/fluxcd/"
+      ]
+    },
+    {
+      "description": "Group all MetalLB components",
+      "groupName": "MetalLB",
+      "matchPackageNames": [
+        "metallb"
+      ],
+      "matchDatasources": [
+        "helm"
+      ]
+    },
+    {
+      "description": "Group all Traefik components",
+      "groupName": "Traefik",
+      "matchPackageNames": [
+        "traefik"
+      ],
+      "matchDatasources": [
+        "helm"
+      ]
+    },
+    {
+      "description": "Require manual review for major updates",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "major-update"
+      ]
+    },
+    {
+      "description": "Weekly schedule for Helm charts",
+      "matchDatasources": [
+        "helm"
+      ],
+      "schedule": [
+        "before 5am on monday"
+      ]
+    },
+    {
+      "description": "Daily schedule for container images using 'latest' tag",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchCurrentVersion": "latest",
+      "schedule": [
+        "after 10pm"
+      ]
+    }
+  ],
+  "kubernetes": {
+    "fileMatch": [
+      "\\.yaml$",
+      "\\.yml$"
+    ]
+  },
+  "helm-values": {
+    "fileMatch": [
+      "k8s/.+/helmrelease\\.yaml$",
+      "k8s/.+/values\\.yaml$"
+    ]
+  },
+  "flux": {
+    "fileMatch": [
+      "k8s/.+\\.yaml$"
+    ]
+  },
+  "ignorePaths": [
+    "bootstrap/**",
+    "docs/**"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Helm chart versions in HelmRelease manifests",
+      "fileMatch": [
+        "k8s/.+/helmrelease\\.yaml$"
+      ],
+      "matchStrings": [
+        "chart:\\s+(?<depName>[^\\s]+)\\s+version:\\s+(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "description": "Update container images with version tags",
+      "fileMatch": [
+        "k8s/.+/deployment\\.yaml$",
+        "k8s/.+/statefulset.*\\.yaml$"
+      ],
+      "matchStrings": [
+        "image:\\s+(?<depName>[^:]+):(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}
