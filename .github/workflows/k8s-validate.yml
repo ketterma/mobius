@@ -83,9 +83,12 @@ jobs:
         run: |
           echo "::group::Kubernetes Schema Validation"
 
-          # Find all YAML files, exclude SOPS encrypted files and flux-system generated files
-          EXIT_CODE=0
+          # Find all YAML files, exclude non-k8s files
+          # - kustomization.yaml: Kustomize config files (not k8s resources)
+          # - *.sops.yaml: Encrypted files
+          # - gotk-*.yaml: Flux-generated files
           find k8s bootstrap \( -name "*.yaml" -o -name "*.yml" \) | \
+            grep -v "kustomization.yaml" | \
             grep -v ".sops.yaml" | \
             grep -v "gotk-components.yaml" | \
             grep -v "gotk-sync.yaml" | \
