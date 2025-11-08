@@ -35,7 +35,7 @@ spec:
             apt-get update -qq
             apt-get install -y -qq curl sudo
             curl -fsSL https://binaries.twingate.com/client/linux/install.sh | bash
-            twingate setup --headless /etc/twingate/service_key.json
+            twingate setup --headless /twingate-key/service_key.json
             twingate start
             echo "Twingate client started successfully"
             # Keep container running and monitor process
@@ -47,10 +47,10 @@ spec:
               sleep 30
             done
 
-        # Mount the service key
+        # Mount the service key at a different path to avoid /etc/twingate conflict
         volumeMounts:
         - name: service-key
-          mountPath: /etc/twingate
+          mountPath: /twingate-key
           readOnly: true
 
         securityContext:
