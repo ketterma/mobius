@@ -6,4 +6,4 @@ metadata:
   namespace: uptime-kuma
 spec:
   interval: 1h
-  url: https://louislam.github.io/uptime-kuma-helm
+  url: https://helm.irsigler.cloud
