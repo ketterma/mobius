@@ -6,6 +6,7 @@ metadata:
   namespace: uptime-kuma
   annotations:
     external-dns.alpha.kubernetes.io/hostname: uptime.jaxon.cloud
+    external-dns.alpha.kubernetes.io/target: 85.31.234.30
 spec:
   entryPoints:
     - websecure
