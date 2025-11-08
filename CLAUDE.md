@@ -186,6 +186,28 @@ ssh root@85.31.234.30  # PHX
 
 ## Recent Changes
 
+### 2025-11-08: Twingate Headless Client Deployment to PHX
+- ✅ Deployed Twingate headless client as DaemonSet on PHX cluster for accessing homelab resources
+- ✅ Implemented Ubuntu-based deployment with official Twingate installer
+- ✅ Fixed DNS resolution by using host DNS policy instead of cluster DNS
+- ✅ Service key SOPS-encrypted and mounted correctly
+- ✅ **Full connectivity verified**: TCP, UDP, and ICMP all working
+- ✅ Configured `ping_group_range` sysctl on N5 for ICMP/ping support
+- ✅ Fixed kubectl context: removed broken `phx-jaxon-cloud`, renamed to `phx`
+- ✅ Documentation: [`docs/twingate-icmp-setup.md`](docs/twingate-icmp-setup.md) - ICMP configuration guide
+
+**Key learnings:**
+1. **DNS policy critical for external connectivity** - Use `dnsPolicy: Default` with hostNetwork for Twingate client to resolve controller domains
+2. **ICMP requires sysctl configuration** - Set `net.ipv4.ping_group_range = 0 2147483647` on connector nodes (official Twingate recommendation)
+3. **Service key mounting** - Mount at non-conflicting path (`/twingate-key/`) to avoid read-only issues with `/etc/twingate`
+4. **Ping works but some hosts block ICMP** - TCP/UDP connectivity is what matters; ICMP ping is bonus
+
+**PHX→Homelab connectivity verified:**
+- DNS queries: `dig @192.168.4.53` ✅
+- HTTP/HTTPS: AdGuard, Traefik working ✅
+- ICMP ping: N5 (192.168.4.5) responding ✅
+- Latency: ~50ms average via Twingate tunnel
+
 ### 2025-11-07: Data Recovery & Clean Slate Recovery
 - ✅ Recovered from accidental deletion of apps kustomization (which garbage collected all apps)
 - ✅ Created ZFS snapshots before recovery (`pre-flux-restore-20251107-001809`)
