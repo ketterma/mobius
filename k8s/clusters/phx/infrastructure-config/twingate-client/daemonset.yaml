@@ -17,7 +17,8 @@ spec:
     spec:
       # Use host network so all pods on the node can access Twingate resources
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # Use Default DNS policy to inherit host DNS configuration for external connectivity
+      dnsPolicy: Default
 
       # Tolerate all taints to run on all nodes
       tolerations:
