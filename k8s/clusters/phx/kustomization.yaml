@@ -5,3 +5,4 @@ resources:
   - flux-system
   - infrastructure.yaml
   - infrastructure-config.yaml
+  - apps.yaml
