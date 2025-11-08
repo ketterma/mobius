@@ -65,6 +65,11 @@ patches:
                 secretKeyRef:
                   name: cloudflare-api-token
                   key: CF_API_TOKEN
+            - name: CLOUDFLARE_DNS_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-api-token
+                  key: CF_API_TOKEN
     target:
       kind: HelmRelease
       name: traefik
