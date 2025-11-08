@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - ../../../../base/infrastructure/traefik
   - cloudflare-secret.sops.yaml
+  - adguard-oidc-secret.sops.yaml
 
 patches:
   # Lab cluster Traefik configuration
@@ -55,13 +56,11 @@ patches:
               valueFrom:
                 secretKeyRef:
                   name: adguard-oidc-config
-                  namespace: adguard-home
                   key: client-secret
             - name: ADGUARD_OIDC_SESSION_KEY
               valueFrom:
                 secretKeyRef:
                   name: adguard-oidc-config
-                  namespace: adguard-home
                   key: session-key
     target:
       kind: HelmRelease
