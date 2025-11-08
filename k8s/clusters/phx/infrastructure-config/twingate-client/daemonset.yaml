@@ -25,15 +25,8 @@ spec:
 
       containers:
       - name: twingate-client
-        image: twingate/connector:1
+        image: twingate/client:latest
         imagePullPolicy: Always
-
-        env:
-        # Enable headless mode - client will use service key instead of connector tokens
-        - name: TWINGATE_HEADLESS
-          value: "true"
-        - name: TWINGATE_LOG_LEVEL
-          value: "3"
 
         # Mount the service key
         volumeMounts:
