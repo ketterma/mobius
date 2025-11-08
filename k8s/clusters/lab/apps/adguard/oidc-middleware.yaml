@@ -7,8 +7,8 @@ metadata:
 spec:
   plugin:
     traefikoidc:
-      # Provider configuration (use internal service to avoid DNS loop)
-      providerURL: "http://pocket-id.pocket-id.svc.cluster.local"
+      # Provider configuration
+      providerURL: "https://auth.jaxon.cloud"
 
       # OAuth credentials (using Go template syntax to reference Traefik env vars)
       clientID: "a6f4cfca-7627-4fcc-9519-81ce2ecd767c"
