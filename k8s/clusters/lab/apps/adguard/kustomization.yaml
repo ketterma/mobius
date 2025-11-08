@@ -8,4 +8,4 @@ resources:
   - service.yaml
   - ingressroute.yaml
   - oidc-secret.sops.yaml
-  - oidc-middleware.yaml
+  - oidc-middleware.sops.yaml
