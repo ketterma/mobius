@@ -45,8 +45,6 @@ spec:
           capabilities:
             drop:
             - ALL
-            add:
-            - NET_RAW  # Required for ICMP ping support
         resources:
           requests:
             memory: "200Mi"
