@@ -1,0 +1,40 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: adguard-oidc-auth
+  namespace: adguard-home
+spec:
+  plugin:
+    traefikoidc:
+      # Provider configuration
+      providerURL: "https://auth.jaxon.cloud"
+
+      # OAuth credentials (using Go template syntax to reference Traefik env vars)
+      clientID: "a6f4cfca-7627-4fcc-9519-81ce2ecd767c"
+      clientSecret: "{{ env \"ADGUARD_OIDC_CLIENT_SECRET\" }}"
+
+      # Session encryption key
+      sessionEncryptionKey: "{{ env \"ADGUARD_OIDC_SESSION_KEY\" }}"
+
+      # Callback configuration
+      callbackURL: "/oauth2/callback"
+
+      # Force HTTPS for redirect URIs
+      forceHTTPS: true
+
+      # Scopes to request
+      scopes:
+        - openid
+        - profile
+        - email
+
+      # Session configuration
+      sessionName: "_adguard_oauth"
+      sessionValidity: 86400  # 24 hours
+
+      # Logging
+      logLevel: "info"
+
+      # Cookie settings (defaults are secure)
+      overrideScopes: false

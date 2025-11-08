@@ -13,6 +13,8 @@ spec:
   routes:
     - match: Host(`dns.jaxon.cloud`)
       kind: Rule
+      middlewares:
+        - name: adguard-oidc-auth
       services:
         - name: adguard-home-web
           port: 80

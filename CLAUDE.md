@@ -11,16 +11,16 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
 ## Quick Reference
 
 ### Infrastructure
-- **VPS:** `cloud.jax-lab.dev` (85.31.234.30) - Dokploy platform, Ubuntu 24.04.3 LTS
-- **N5:** `n5.jax-lab.dev` (192.168.4.5) - k0s control-plane, AMD Ryzen AI 9 HX PRO 370, 91GB RAM
-- **M1-ubuntu:** `m1-ubuntu.local` (192.168.4.81) - k0s worker node
+- **PHX:** `phx.jaxon.cloud` (85.31.234.30) - Cloud VPS in Phoenix, AZ. Single-node k0s cluster (Ubuntu 24.04), public ingress gateway with Traefik, Twingate VPN connector to homelab
+- **N5:** `n5.jax-lab.dev` (192.168.4.5) - On-premises k0s control-plane, AMD Ryzen AI 9 HX PRO 370, 91GB RAM
+- **M1-ubuntu:** `m1-ubuntu.local` (192.168.4.81) - On-premises k0s worker node
 
 ### Access
 - **SSH:** Key-based authentication
-  - VPS: `ssh root@cloud.jax-lab.dev`
+  - PHX: `ssh root@85.31.234.30`
   - N5: `ssh jax@192.168.4.5` (passwordless sudo)
-- **Kubernetes:** `kubectl` configured for N5 cluster
-- **Domain:** `jax-lab.dev` (Cloudflare DNS)
+- **Kubernetes:** `kubectl` contexts for both `phx-jaxon-cloud` and `homelab` clusters
+- **Domain:** `jaxon.cloud` (Cloudflare DNS, public), `jaxon.home` (internal)
 
 ### Network (Multi-VLAN)
 - **VLAN 1** (192.168.4.0/24): Infrastructure - k0s nodes, SSH, services
@@ -29,30 +29,37 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
 - **VLAN 64** (192.168.64.0/20): IoT - Home Assistant, smart devices
 
 ### Key Services
-- **AdGuard Home:** `192.168.4.53` (DNS) - `https://dns.jax-lab.dev`
-- **Traefik:** `192.168.8.50` (Ingress) - Kubernetes LoadBalancer
-- **Home Assistant:** `192.168.64.2:8123` (VM) - `https://home.jax-lab.dev`
-- **Uptime Kuma:** `https://uptime.jax-lab.dev` (VPS monitoring)
-- **Dokploy:** `https://dokploy.jax-lab.dev` (VPS container platform)
+- **AdGuard Home:** `192.168.4.53` (DNS) - `https://dns.jaxon.home`
+- **Traefik (Homelab):** `192.168.8.50` (Ingress) - Kubernetes LoadBalancer
+- **Traefik (PHX):** `85.31.234.30` (Public Ingress) - Kubernetes LoadBalancer
+- **Home Assistant:** `192.168.64.2:8123` (VM) - `https://home.jaxon.home`
+- **Pocket-ID:** Authentication service - `https://auth.jaxon.home`
+- **Twingate:** VPN connector on PHX bridging to homelab
 
 ## Repository Structure
 
 ### Configuration Files
 - **`bootstrap/`** - Infrastructure bootstrap configs
   - `n5-netplan.yaml` - N5 network configuration (netplan)
-  - `homelab-k0sctl.yaml` - k0s cluster configuration
+  - `homelab-k0sctl.yaml` - Homelab k0s cluster configuration
+  - `phx-k0sctl.yaml` - PHX k0s cluster configuration
   - `metallb-config.yaml` - MetalLB LoadBalancer pools
   - `homelab-storageclasses.yaml` - OpenEBS ZFS StorageClasses
   - `homeassistant-vm.xml` - Home Assistant VM libvirt definition
 - **`k8s/`** - Kubernetes manifests (Flux CD GitOps)
   - `clusters/lab/` - Homelab cluster configuration
-  - `clusters/lab/flux-system/` - Flux CD system components
-  - `clusters/lab/infrastructure-config/` - Infrastructure services (MetalLB, Traefik, AdGuard)
-  - `clusters/lab/apps/` - Application deployments
+    - `flux-system/` - Flux CD system components
+    - `infrastructure-config/` - Infrastructure services (MetalLB, Traefik, AdGuard)
+    - `apps/` - Application deployments (AdGuard, Pocket-ID)
+  - `clusters/phx/` - PHX cloud cluster configuration
+    - `flux-system/` - Flux CD system components
+    - `infrastructure/` - Infrastructure overlays (Traefik, MetalLB, External-DNS)
+    - `infrastructure-config/` - MetalLB IP pools, Twingate connector
 
 ### Documentation
 - **`docs/lab-network.md`** - Complete network topology and IP inventory
 - **`docs/lab-vm-haos.md`** - Home Assistant VM configuration and management
+- **`docs/jaxon-cloud-architecture.md`** - PHX cloud architecture and multi-cluster design
 - **`CLAUDE.md`** - This file (repository overview)
 
 ## Technologies
@@ -106,6 +113,13 @@ Sensitive secrets (e.g., Cloudflare API token) are encrypted using SOPS with age
 - Age private key: Derived from SSH Ed25519 key using `ssh-to-age`
 - Flux automatically decrypts secrets during deployment
 
+### External-DNS with Traefik IngressRoutes (PHX Cluster)
+For external-dns to automatically create DNS records from Traefik IngressRoutes, **both** annotations are required:
+- `external-dns.alpha.kubernetes.io/hostname: <domain>` - Specifies the DNS hostname to create
+- `external-dns.alpha.kubernetes.io/target: <ip>` - Specifies the target IP address for the A record
+
+Without the `target` annotation, external-dns will not create the DNS record even though it's watching the `traefik-proxy` source.
+
 ## Common Tasks
 
 ### Deploy Configuration Changes
@@ -149,6 +163,12 @@ ip addr show
 ip route show
 ```
 
+### Clear AdGuard Home DNS Cache
+```bash
+# Clear DNS cache via API (useful when AdGuard caches NXDOMAIN responses)
+curl -X POST -H "Content-Type: application/json" https://dns.jaxon.cloud/control/cache_clear
+```
+
 ### Access Services
 ```bash
 # DNS query via AdGuard
@@ -159,9 +179,9 @@ curl -k https://dns.jax-lab.dev
 curl -k --resolve dns.jax-lab.dev:443:192.168.8.50 https://dns.jax-lab.dev
 
 # SSH to hosts
-ssh jax@192.168.4.5        # N5
-ssh jax@192.168.4.81       # M1-ubuntu
-ssh root@cloud.jax-lab.dev # VPS
+ssh jax@192.168.4.5    # N5
+ssh jax@192.168.4.81   # M1-ubuntu
+ssh root@85.31.234.30  # PHX
 ```
 
 ## Recent Changes
