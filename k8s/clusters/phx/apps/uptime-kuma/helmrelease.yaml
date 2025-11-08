@@ -25,7 +25,7 @@ spec:
     # Uptime Kuma configuration
     image:
       repository: louislam/uptime-kuma
-      tag: 1
+      tag: 2
       pullPolicy: IfNotPresent
 
     # Persistent storage for Uptime Kuma data
