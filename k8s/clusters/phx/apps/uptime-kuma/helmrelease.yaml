@@ -49,6 +49,9 @@ spec:
         memory: "512Mi"
         cpu: "500m"
 
+    # Use host DNS instead of cluster DNS to avoid resolution issues
+    dnsPolicy: Default
+
     # Ingress disabled - we'll use Traefik IngressRoute instead
     ingress:
       enabled: false
