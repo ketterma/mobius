@@ -113,12 +113,31 @@ Sensitive secrets (e.g., Cloudflare API token) are encrypted using SOPS with age
 - Age private key: Derived from SSH Ed25519 key using `ssh-to-age`
 - Flux automatically decrypts secrets during deployment
 
-### External-DNS with Traefik IngressRoutes (PHX Cluster)
-For external-dns to automatically create DNS records from Traefik IngressRoutes, **both** annotations are required:
-- `external-dns.alpha.kubernetes.io/hostname: <domain>` - Specifies the DNS hostname to create
-- `external-dns.alpha.kubernetes.io/target: <ip>` - Specifies the target IP address for the A record
+### External-DNS with Traefik IngressRoutes
 
-Without the `target` annotation, external-dns will not create the DNS record even though it's watching the `traefik-proxy` source.
+**IMPORTANT:** External-DNS is configured on BOTH clusters and automatically manages DNS records. **DO NOT manually create DNS rewrites in AdGuard Home or Cloudflare** - they are automatically created from IngressRoute annotations.
+
+**Homelab Cluster (AdGuard Home via webhook):**
+For external-dns to automatically create DNS rewrites in AdGuard Home from Traefik IngressRoutes, **both** annotations are required:
+- `external-dns.alpha.kubernetes.io/hostname: <domain>` - Specifies the DNS hostname to create
+- `external-dns.alpha.kubernetes.io/target: <ip>` - Specifies the target IP address (typically `192.168.8.50` for Traefik)
+
+Example (homelab):
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: leantime.jaxon.cloud
+    external-dns.alpha.kubernetes.io/target: 192.168.8.50
+```
+
+**PHX Cluster (Cloudflare API):**
+For external-dns to automatically create DNS records in Cloudflare from Traefik IngressRoutes, **both** annotations are required:
+- `external-dns.alpha.kubernetes.io/hostname: <domain>` - Specifies the DNS hostname to create
+- `external-dns.alpha.kubernetes.io/target: <ip>` - Specifies the target IP address (typically `85.31.234.30` for PHX public IP)
+
+**Without the `target` annotation, external-dns will NOT create DNS records** even though it's watching the IngressRoute resource.
 
 ## Common Tasks
 
