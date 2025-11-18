@@ -7,3 +7,5 @@ resources:
   - pocket-id
   - unifi
   - nexterm
+  - claude-code-ui
+  - vikunja
