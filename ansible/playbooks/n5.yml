@@ -1,0 +1,8 @@
+---
+- name: Configure N5 host
+  hosts: n5
+  become: true
+
+  roles:
+    - role: sanoid
+      tags: [sanoid, backup]

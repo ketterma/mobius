@@ -1,0 +1,31 @@
+# Sanoid configuration - managed by Ansible
+# Do not edit manually
+
+#############################
+# Templates
+#############################
+{% for name, template in sanoid_templates.items() %}
+
+[template_{{ name }}]
+{% for key, value in template.items() %}
+	{{ key }} = {{ value }}
+{% endfor %}
+{% endfor %}
+
+#############################
+# Datasets
+#############################
+{% for dataset in sanoid_datasets %}
+
+[{{ dataset.name }}]
+	use_template = {{ dataset.use_template }}
+{% if dataset.recursive is defined %}
+	recursive = {{ dataset.recursive }}
+{% endif %}
+{% if dataset.pre_snapshot_script is defined %}
+	pre_snapshot_script = {{ dataset.pre_snapshot_script }}
+{% endif %}
+{% if dataset.post_snapshot_script is defined %}
+	post_snapshot_script = {{ dataset.post_snapshot_script }}
+{% endif %}
+{% endfor %}

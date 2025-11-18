@@ -1,0 +1,40 @@
+---
+# Sanoid configuration defaults
+
+sanoid_config_path: /etc/sanoid/sanoid.conf
+
+# Snapshot retention templates
+sanoid_templates:
+  production:
+    frequently: 0
+    hourly: 24
+    daily: 7
+    weekly: 4
+    monthly: 3
+    yearly: 0
+    autosnap: "yes"
+    autoprune: "yes"
+
+  backup:
+    frequently: 0
+    hourly: 0
+    daily: 7
+    weekly: 4
+    monthly: 12
+    yearly: 0
+    autosnap: "no"
+    autoprune: "yes"
+
+# Datasets to manage with sanoid
+sanoid_datasets:
+  - name: vms/HomeAssistant
+    use_template: production
+    recursive: "no"
+    pre_snapshot_script: /usr/local/bin/pre-snapshot-homeassistant.sh
+    post_snapshot_script: /usr/local/bin/post-snapshot-homeassistant.sh
+
+# Backup dataset for syncoid replication
+sanoid_backup_dataset: tank/backup/homeassistant-vm
+
+# HA VM details for fs-freeze
+ha_vm_name: HomeAssistant

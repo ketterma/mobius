@@ -1,0 +1,30 @@
+#!/bin/bash
+# Pre-snapshot script for HomeAssistant VM
+# Freezes filesystem for consistent ZFS snapshot
+# Managed by Ansible - do not edit manually
+
+set -e
+
+VM_NAME="{{ ha_vm_name }}"
+TIMEOUT=30
+
+# Check if VM is running
+if ! virsh list --name | grep -q "^${VM_NAME}$"; then
+    echo "VM ${VM_NAME} is not running, skipping fs-freeze"
+    exit 0
+fi
+
+# Check if guest agent is available
+if ! virsh qemu-agent-command "${VM_NAME}" '{"execute":"guest-ping"}' &>/dev/null; then
+    echo "Guest agent not responding, skipping fs-freeze"
+    exit 0
+fi
+
+# Freeze filesystems
+echo "Freezing filesystems on ${VM_NAME}..."
+if virsh domfsfreeze "${VM_NAME}"; then
+    echo "Filesystems frozen successfully"
+else
+    echo "Warning: Failed to freeze filesystems"
+    exit 1
+fi

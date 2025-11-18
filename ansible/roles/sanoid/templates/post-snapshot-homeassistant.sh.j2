@@ -1,0 +1,23 @@
+#!/bin/bash
+# Post-snapshot script for HomeAssistant VM
+# Thaws filesystem after ZFS snapshot
+# Managed by Ansible - do not edit manually
+
+set -e
+
+VM_NAME="{{ ha_vm_name }}"
+
+# Check if VM is running
+if ! virsh list --name | grep -q "^${VM_NAME}$"; then
+    echo "VM ${VM_NAME} is not running, skipping fs-thaw"
+    exit 0
+fi
+
+# Thaw filesystems
+echo "Thawing filesystems on ${VM_NAME}..."
+if virsh domfsthaw "${VM_NAME}"; then
+    echo "Filesystems thawed successfully"
+else
+    echo "Warning: Failed to thaw filesystems"
+    # Don't exit with error - VM may have auto-thawed
+fi

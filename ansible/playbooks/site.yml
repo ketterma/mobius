@@ -1,0 +1,6 @@
+---
+# Main playbook for all homelab infrastructure
+# Run with: ansible-playbook playbooks/site.yml
+# Dry-run: ansible-playbook playbooks/site.yml --check --diff
+
+- import_playbook: n5.yml

@@ -1,0 +1,5 @@
+---
+- name: restart sanoid-prune
+  ansible.builtin.systemd:
+    name: sanoid.timer
+    state: restarted

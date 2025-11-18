@@ -1,0 +1,50 @@
+---
+- name: Install sanoid
+  ansible.builtin.apt:
+    name: sanoid
+    state: present
+    update_cache: yes
+
+- name: Ensure sanoid config directory exists
+  ansible.builtin.file:
+    path: /etc/sanoid
+    state: directory
+    mode: '0755'
+
+- name: Deploy sanoid configuration
+  ansible.builtin.template:
+    src: sanoid.conf.j2
+    dest: "{{ sanoid_config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart sanoid-prune
+
+- name: Create backup dataset
+  community.general.zfs:
+    name: "{{ sanoid_backup_dataset }}"
+    state: present
+  when: sanoid_backup_dataset is defined
+
+- name: Deploy pre-snapshot script (fs-freeze)
+  ansible.builtin.template:
+    src: pre-snapshot-homeassistant.sh.j2
+    dest: /usr/local/bin/pre-snapshot-homeassistant.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy post-snapshot script (fs-thaw)
+  ansible.builtin.template:
+    src: post-snapshot-homeassistant.sh.j2
+    dest: /usr/local/bin/post-snapshot-homeassistant.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Enable and start sanoid timer
+  ansible.builtin.systemd:
+    name: sanoid.timer
+    enabled: yes
+    state: started
+    daemon_reload: yes
