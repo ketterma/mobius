@@ -67,6 +67,7 @@ ssh jax@192.168.4.5 "sudo virsh qemu-agent-command HomeAssistant '{\"execute\":\
 - **Traefik (PHX):** `85.31.234.30` (Public Ingress) - Kubernetes LoadBalancer
 - **Home Assistant:** `192.168.64.2:8123` (VM) - `https://home.jaxon.home`
 - **Pocket-ID:** Authentication service - `https://auth.jaxon.home`
+- **Vikunja:** Task management - `https://tasks.jaxon.cloud`
 - **Twingate:** VPN connector on PHX bridging to homelab
 
 ## Repository Structure
@@ -199,6 +200,39 @@ git push
 flux reconcile source git flux-system
 flux reconcile kustomization infrastructure-config
 ```
+
+### Deploy New Applications (IMPORTANT)
+
+**ALWAYS test new deployments before adding to GitOps.** Flux's `wait: true` setting means one broken app blocks ALL reconciliation.
+
+```bash
+# 1. Create manifests in k8s/clusters/lab/apps/<app-name>/
+#    - namespace.yaml, deployment.yaml, service.yaml, etc.
+
+# 2. TEST FIRST - Apply directly to cluster
+kubectl apply -f k8s/clusters/lab/apps/<app-name>/namespace.yaml
+kubectl apply -f k8s/clusters/lab/apps/<app-name>/
+
+# 3. Verify it works
+kubectl -n <app-name> get pods
+kubectl -n <app-name> logs deployment/<app-name>
+curl -k https://<app-domain>/health  # or appropriate endpoint
+
+# 4. ONLY after confirmed working, add to GitOps
+#    Edit k8s/clusters/lab/apps/kustomization.yaml to include the app
+#    Then commit and push
+
+# 5. If something breaks after committing:
+#    - Fix the manifest
+#    - Apply directly: kubectl apply -f <fixed-file>
+#    - Then commit the fix to git
+```
+
+**Common deployment issues:**
+- Volume mounts overwriting application directories
+- Missing environment variables
+- Wrong container ports
+- Permission issues (check `securityContext.fsGroup`)
 
 ### Check Service Status
 ```bash
