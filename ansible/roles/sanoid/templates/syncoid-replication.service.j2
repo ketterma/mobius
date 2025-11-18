@@ -1,0 +1,7 @@
+[Unit]
+Description=Syncoid ZFS Replication
+After=zfs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/syncoid-replication.sh

@@ -1,0 +1,13 @@
+#!/bin/bash
+# Syncoid replication script
+# Managed by Ansible - do not edit manually
+
+set -e
+
+{% for job in syncoid_jobs %}
+echo "Starting replication: {{ job.source }} -> {{ job.destination }}"
+syncoid --no-sync-snap {{ job.source }} {{ job.destination }}
+echo "Replication complete: {{ job.name }}"
+{% endfor %}
+
+echo "All replication jobs completed successfully"

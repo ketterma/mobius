@@ -20,11 +20,8 @@
     mode: '0644'
   notify: restart sanoid-prune
 
-- name: Create backup dataset
-  community.general.zfs:
-    name: "{{ sanoid_backup_dataset }}"
-    state: present
-  when: sanoid_backup_dataset is defined
+# Note: Don't create backup dataset - syncoid needs it to not exist for initial replication
+# syncoid will create tank/backup/homeassistant-vm on first run
 
 - name: Deploy pre-snapshot script (fs-freeze)
   ansible.builtin.template:
@@ -48,3 +45,41 @@
     enabled: yes
     state: started
     daemon_reload: yes
+
+# Syncoid replication setup
+- name: Deploy syncoid replication script
+  ansible.builtin.template:
+    src: syncoid-replication.sh.j2
+    dest: /usr/local/bin/syncoid-replication.sh
+    owner: root
+    group: root
+    mode: '0755'
+  when: syncoid_jobs is defined
+
+- name: Deploy syncoid systemd service
+  ansible.builtin.template:
+    src: syncoid-replication.service.j2
+    dest: /etc/systemd/system/syncoid-replication.service
+    owner: root
+    group: root
+    mode: '0644'
+  when: syncoid_jobs is defined
+  notify: reload systemd
+
+- name: Deploy syncoid systemd timer
+  ansible.builtin.template:
+    src: syncoid-replication.timer.j2
+    dest: /etc/systemd/system/syncoid-replication.timer
+    owner: root
+    group: root
+    mode: '0644'
+  when: syncoid_jobs is defined
+  notify: reload systemd
+
+- name: Enable and start syncoid timer
+  ansible.builtin.systemd:
+    name: syncoid-replication.timer
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: syncoid_jobs is defined
