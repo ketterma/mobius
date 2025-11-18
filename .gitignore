@@ -23,4 +23,4 @@ media/llmvision
 .claude/*local*
 .config/**
 !.config/ssh/config
-!.config/ssh/known_hosts
+!.config/ssh/known_hosts# Test GitOps flow - Mon Nov 17 23:01:01 PST 2025
