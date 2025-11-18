@@ -53,6 +53,8 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
   - Separate orphan branch with independent history
   - Gitignored from main branch, accessed via `git worktree`
   - Deployed to HA VM via git pull addon
+  - **Setup:** `git worktree add homeassistant homeassistant`
+  - **Working in it:** `cd homeassistant` then normal git commands (commits go to `homeassistant` branch)
 - **`k8s/`** - Kubernetes manifests (Flux CD GitOps)
   - `clusters/lab/` - Homelab cluster configuration
     - `flux-system/` - Flux CD system components
