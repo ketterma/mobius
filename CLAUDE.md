@@ -46,6 +46,13 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
   - `metallb-config.yaml` - MetalLB LoadBalancer pools
   - `homelab-storageclasses.yaml` - OpenEBS ZFS StorageClasses
   - `homeassistant-vm.xml` - Home Assistant VM libvirt definition
+- **`ansible/`** - Ansible playbooks and roles for bare-metal management
+  - `inventory/hosts.yml` - Host inventory (N5, M1-ubuntu, PHX)
+  - `roles/sanoid/` - ZFS snapshot management with Sanoid/Syncoid
+- **`homeassistant/`** - Git worktree for `homeassistant` branch (HA config at root)
+  - Separate orphan branch with independent history
+  - Gitignored from main branch, accessed via `git worktree`
+  - Deployed to HA VM via git pull addon
 - **`k8s/`** - Kubernetes manifests (Flux CD GitOps)
   - `clusters/lab/` - Homelab cluster configuration
     - `flux-system/` - Flux CD system components
@@ -204,6 +211,67 @@ ssh root@85.31.234.30  # PHX
 ```
 
 ## Recent Changes
+
+### 2025-11-17: Home Assistant GitOps Integration & ZFS Backup System
+- ✅ Set up Sanoid/Syncoid for automated ZFS snapshots of Home Assistant VM
+- ✅ Created Ansible infrastructure for managing bare-metal hosts (`ansible/`)
+- ✅ Integrated Home Assistant config into mobius repo using orphan branch `homeassistant`
+- ✅ Configured git pull addon to deploy from `ketterma/mobius.git` branch `homeassistant`
+- ✅ Added webhook automation (`git-pull-deploy`) to trigger config updates
+- ✅ Recovered from accidental config deletion using ZFS snapshot rollback
+
+**Home Assistant Supervisor API Access:**
+To programmatically manage Home Assistant addons, use the **Remote API proxy** addon:
+1. Install from repo: `https://github.com/home-assistant/addons-development`
+2. Start the addon and get the API key from logs
+3. Access Supervisor API at `http://192.168.64.2:80/` with Bearer token
+4. Example: `curl -H "Authorization: Bearer <token>" http://192.168.64.2:80/addons/core_git_pull/info`
+
+**Git Pull Addon Configuration:**
+- When changing repository URL, must also update the local git remote manually
+- The addon checks if origin matches config - mismatch causes failure
+- Use `git_command: reset` to force fresh clone (but backs up to container /tmp first!)
+- **CRITICAL**: If changing repos, manually update remote first: `git remote set-url origin <new-url>`
+
+**Webhook for GitOps:**
+```yaml
+# automations.yaml
+- id: 'ha_github_pipeline'
+  alias: Home Assistant GitHub Pipeline
+  triggers:
+  - trigger: webhook
+    webhook_id: git-pull-deploy
+    allowed_methods:
+    - POST
+  actions:
+  - action: hassio.addon_start
+    data:
+      addon: core_git_pull
+```
+
+Trigger with: `curl -X POST http://192.168.64.2:8123/api/webhook/git-pull-deploy`
+
+**ZFS Snapshot Backup (Sanoid):**
+- Hourly snapshots on `vms/HomeAssistant` (24 hours retention)
+- Daily replication to `tank/backup/homeassistant-vm` (7 days retention)
+- Pre/post snapshot scripts for fs-freeze via QEMU guest agent
+- Ansible role at `ansible/roles/sanoid/`
+
+**Key learnings:**
+1. **ZFS snapshots are essential** - Saved us from total config loss when git pull addon wiped /homeassistant
+2. **Remote API proxy addon** - Required for programmatic Supervisor API access from outside HA
+3. **Long-lived access tokens** - Work for `/api/` but NOT for `/api/hassio/*` endpoints (need Supervisor token)
+4. **Git pull addon limitations** - Cannot change repo URL without manual intervention; backs up to container /tmp which is lost on failure
+5. **Orphan branches** - Perfect for separate histories in same repo (HA config at root, main branch has k8s)
+6. **hass-cli tool** - Install with `uv pip install homeassistant-cli`, useful for HA API interaction
+
+**Recovery from git pull addon failure:**
+1. Shut down VM: `virsh shutdown HomeAssistant`
+2. Rollback to snapshot: `zfs rollback vms/HomeAssistant@<snapshot>`
+3. Start VM: `virsh start HomeAssistant`
+4. Manually fix git remote: `ssh root@192.168.64.2 "cd /homeassistant && git remote set-url origin <url>"`
+5. Fetch and checkout correct branch
+6. Update addon config via Remote API proxy
 
 ### 2025-11-08: Twingate Headless Client Deployment to PHX
 - ✅ Deployed Twingate headless client as DaemonSet on PHX cluster for accessing homelab resources

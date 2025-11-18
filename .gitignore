@@ -4,3 +4,12 @@ age.agekey
 *.agekey
 .sops/
 backups/
+
+# Home Assistant API tokens
+.env
+
+# Python virtual environments
+.venv/
+
+# Home Assistant config (separate git worktree)
+homeassistant/
