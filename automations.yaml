@@ -144,11 +144,15 @@
       trigger_state: recording
 - id: '1756582270409'
   alias: Home Assistant GitHub Pipeline
-  description: ''
+  description: 'Triggers git pull addon when new commits detected or webhook received'
   triggers:
   - trigger: state
     entity_id:
-    - sensor.ketterma_homeassistant_latest_commit
+    - sensor.ketterma_mobius_latest_commit
+  - trigger: webhook
+    webhook_id: git-pull-deploy
+    allowed_methods:
+    - POST
   conditions: []
   actions:
   - action: hassio.addon_start
