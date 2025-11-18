@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - pvc.yaml
   - secret.sops.yaml
+  - oidc-config.sops.yaml
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml

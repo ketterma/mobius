@@ -68,7 +68,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: oidc-config
+              mountPath: /etc/vikunja
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: vikunja-data
+        - name: oidc-config
+          secret:
+            secretName: vikunja-oidc-config

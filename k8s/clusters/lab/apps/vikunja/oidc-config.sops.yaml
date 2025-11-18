@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: vikunja-oidc-config
+    namespace: vikunja
+type: Opaque
+stringData:
+    config.yml: ENC[AES256_GCM,data:nHoIKwfqIi9A+kWOrkmkPSpZG4NSt2Vqaost4uRZN4CnMQn8UMRrd1Yso+wL5+nxmlTQPjC4ChhKnEadex+RI+lbPG1teeCob8knluF9w+iebOsjOkeSIJpEzriPVfMxPty9+aO/GjpbvhAg28AO2Urc2ZQn23wgvksfq4kdTwvR3of2ElT1G0y741Y/XUmujj6S//ArK/SxXR3LNKoiaW5R2sIrYAFBU5TrFfCeaWZKb2U7MxqXlco/17RyJEE7rD7d92WEXULM8Z1WOw4hSvF8T53g0sJsVOP0RMkSqAW0KOh/RF57kbDDOHi1u83r0WdqU1rD0txxmJIo4Gwp2mN4/Gl15Rfeu3O8ocF1I64aQI71,iv:/fnmxKW5TnYA88XEHMGRtM42ChCP9vlDKh4hc+YM0vs=,tag:Ik2KUl+OAnA6hNibq8OYkQ==,type:str]
+sops:
+    age:
+        - recipient: age1hhwgd0zzsuqrg7gad42kh547lkgfeqsu03uql375uzslz0vqc37sknuux0
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3UDNUbDBpVTFPWmhndHVq
+            ckJZaFpTcloveE5lS2ZZT0QzSnJ3cmJ6VGtRCjllckNYYTJrcVJtN3RzU09xcVNt
+            QXpTYTJmS0RQeE9wNkdMOHBlbWVpRncKLS0tIFI0T0N3WnNHV3ZqMlFwMHBOU2RK
+            Y1JUbmNsQ3BmT0tKWmY5Z3cramdudXcKg8dUsY2XrlV0mYYq+TdPoxiTcznYiCfV
+            t+Fz6So/m+AKdWXfc2NVbv1zv8O+60gMpynBKGHTTD0eIQRrR33zag==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2025-11-18T23:49:20Z"
+    mac: ENC[AES256_GCM,data:wRwNXgiWOPXEODSPke4oqYnd/aAl1dwo5aelZnMDHQNR0lhtKbje+Z6NIN5AxHEucsPBq5CNZ0flZVqGhlNBhv1PFhxzZwiM93RMq+mOknCQC9fbowojT4dyd5AGw9iUhNv1XRhaQ17+dedyjxguhZ16IRf3ZHhW3/okVSeXaIs=,iv:JMx9XKZ2r0qS10DzbS2zBBwRS+F9OPaBepX2zq16l5A=,tag:PPQxCSer8QSRA4r2eL5Tzw==,type:str]
+    encrypted_regex: ^(data|stringData)$
+    version: 3.10.2
