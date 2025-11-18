@@ -6,12 +6,13 @@
     event: sunset
     offset: -00:15:00
   actions:
-  - service: light.turn_on
-    target:
-      entity_id: light.driveway
+  - target:
+      entity_id:
+      - light.driveway_driveway_light
     data:
       brightness_pct: 50
       transition: 900
+    action: light.turn_on
   mode: single
 - id: '1755668333675'
   alias: Driveway - Smooth Sunrise Fade Out
@@ -21,11 +22,12 @@
     event: sunrise
     offset: 00:15:00
   actions:
-  - service: light.turn_off
-    target:
-      entity_id: light.driveway
+  - target:
+      entity_id:
+      - light.driveway_driveway_light
     data:
       transition: 900
+    action: light.turn_off
   mode: single
 - id: security_lights_activate
   alias: Security Lights - Person/Vehicle Detected
@@ -54,8 +56,7 @@
         entity_id: timer.security_lights_timer
         state: idle
       sequence:
-      - service: scene.create
-        data:
+      - data:
           scene_id: security_lights_restore
           snapshot_entities:
           - light.driveway
@@ -63,14 +64,15 @@
           - light.front_porch_2
           - light.front_porch_3
           - light.back_door_lantern
-      - service: light.turn_on
-        target:
-          entity_id: light.driveway
+        action: scene.create
+      - target:
+          entity_id:
+          - light.driveway_driveway_light
         data:
           brightness_pct: 80
           transition: 5
-      - service: light.turn_on
-        target:
+        action: light.turn_on
+      - target:
           entity_id:
           - light.front_porch_1
           - light.front_porch_2
@@ -79,9 +81,10 @@
         data:
           brightness_pct: 100
           transition: 5
-  - service: timer.start
-    target:
+        action: light.turn_on
+  - target:
       entity_id: timer.security_lights_timer
+    action: timer.start
   mode: restart
 - id: security_lights_reset
   alias: Security Lights - Reset After Timer
@@ -101,62 +104,13 @@
     target:
       entity_id: scene.security_lights_restore
   mode: single
-- id: '1756056166666'
-  alias: Camera Vision
+- id: '1761466432472'
+  alias: Water Closet Switch
   description: ''
   use_blueprint:
-    path: valentinfrlch/event_summary.yaml
+    path: jax/inovelli_hue.yaml
     input:
-      camera_entities:
-      - camera.g4_pro_high_2
-      - camera.g3_bullet_high
-      - camera.g4_pro_high_3
-      - camera.g4_pro_high
-      - camera.g4_doorbell_high
-      provider: 01K3EH5S6PF16B7X3ZRWVMW0FJ
-      notify_device:
-      - 83960fe87fb8b1c1bb5ab0a4de1b8011
-      preview_mode: Live Preview
-      notification_time: ''
-      model: gemini-2.5-flash
-      motion_sensors:
-      - binary_sensor.driveway_af_animal_detected
-      - binary_sensor.driveway_af_person_detected
-      - binary_sensor.driveway_af_vehicle_detected
-      - binary_sensor.driveway_backdoor_animal_detected
-      - binary_sensor.driveway_cdv_animal_detected
-      - binary_sensor.front_door_animal_detected
-      - binary_sensor.g4_pro_person_detected
-      - binary_sensor.driveway_cdv_person_detected
-      - binary_sensor.g4_doorbell_person_detected
-      - binary_sensor.g4_pro_vehicle_detected
-      - binary_sensor.driveway_cdv_vehicle_detected
-      - binary_sensor.g4_doorbell_vehicle_detected
-      - binary_sensor.g4_doorbell_motion
-      - binary_sensor.g4_doorbell_package_detected
-      - binary_sensor.g4_doorbell_doorbell
-      cooldown:
-        hours: 0
-        minutes: 2
-        seconds: 0
-      use_memory: false
-      analysis_mode: Live Preview
-      trigger_state: recording
-- id: '1756582270409'
-  alias: Home Assistant GitHub Pipeline
-  description: 'Triggers git pull addon when new commits detected or webhook received'
-  triggers:
-  - trigger: state
-    entity_id:
-    - sensor.ketterma_mobius_latest_commit
-  - trigger: webhook
-    webhook_id: git-pull-deploy
-    allowed_methods:
-    - POST
-  conditions: []
-  actions:
-  - action: hassio.addon_start
-    metadata: {}
-    data:
-      addon: core_git_pull
-  mode: single
+      controller: c3a304139f53a04585554e69356b40a0
+      target_light: light.hue_color_downlight_1_3
+      onoff_transition_number: number.main_bathroom_water_closet_switch_on_off_transition_time
+      switch_level_entity: light.main_bathroom_water_closet_switch

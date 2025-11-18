@@ -1,0 +1,219 @@
+blueprint:
+  name: Inovelli Blue → Hue (Pretend-Bind, ZHA)
+  description: >
+    Mirror an Inovelli Blue (ZHA) switch's button semantics and fade behavior to a
+    Hue light or group *without* removing bulbs from the Hue Bridge. Works off
+    zha_event (no state mirroring), supports tap/hold/release, and can final-sync
+    the Hue brightness to the switch's reported level on release.
+  domain: automation
+  source_url: https://github.com/ketterma/homeassistant-blueprints
+
+  input:
+    controller:
+      name: Inovelli Blue device (ZHA)
+      description: Select the Inovelli Blue switch device (the one that emits zha_event).
+      selector:
+        device:
+          integration: zha
+    target_light:
+      name: Target Hue light/group
+      description: Hue entity to control (kept on the Hue Bridge).
+      selector:
+        entity:
+          domain: light
+    min_brightness_pct:
+      name: Min brightness % (Down tap when OFF)
+      default: 8
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: slider
+          step: 1
+          unit_of_measurement: "%"
+    # Optional: read switch's on/off transition from its number entity (tenths)
+    onoff_transition_number:
+      name: (Optional) Switch On/Off Transition entity (number.* in 1/10s)
+      description: >
+        If set, the automation will read this number and use it (value/10) as the
+        fade time for tap up/down actions. Leave empty to use the fallback below.
+      default: ""
+      selector:
+        entity:
+          domain: number
+          multiple: false
+          # leave unfiltered; not all models share the same key
+    onoff_transition_seconds_fallback:
+      name: Fallback On/Off transition (seconds)
+      description: Used if the number entity above is not provided.
+      default: 0.20
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 0.05
+          mode: slider
+          unit_of_measurement: s
+    # Optional: use a final sync on release/stop
+    enable_final_sync:
+      name: Final sync Hue to switch brightness on release/stop
+      default: true
+      selector:
+        boolean: {}
+    switch_level_entity:
+      name: (Optional) Switch light entity for level readback
+      description: >
+        If final sync is enabled, provide the switch's light entity that exposes a
+        brightness attribute (e.g., light.my_switch). If omitted, final sync is skipped.
+      default: ""
+      selector:
+        entity:
+          domain: light
+          multiple: false
+    final_sync_delay_ms:
+      name: Final sync delay after release (ms)
+      description: Small wait so ZHA updates the switch's brightness before we read it.
+      default: 120
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 10
+          mode: slider
+          unit_of_measurement: ms
+
+mode: restart
+
+variables:
+  tgt: !input target_light
+  min_pct: !input min_brightness_pct
+  onoff_num: !input onoff_transition_number
+  onoff_fallback: !input onoff_transition_seconds_fallback
+  do_final_sync: !input enable_final_sync
+  sw_level_entity: !input switch_level_entity
+  final_sync_delay_ms: !input final_sync_delay_ms
+
+  # Compute on/off transition seconds:
+  onoff_sec: >-
+    {% set ent = onoff_num %}
+    {% if ent %}
+      {{ (states(ent) | float(default=onoff_fallback*10)) / 10 }}
+    {% else %}
+      {{ onoff_fallback }}
+    {% endif %}
+
+trigger:
+  # All zha_event from the selected device
+  - platform: event
+    event_type: zha_event
+    id: zha
+    event_data:
+      device_id: !input controller
+
+  # Some firmwares emit a Level cluster stop; catch it too
+  - platform: event
+    event_type: zha_event
+    id: zigbee_stop
+    event_data:
+      device_id: !input controller
+      cluster_id: 8
+      command: stop
+
+action:
+  - variables:
+      cmd: "{{ trigger.event.data.command }}"
+      args: "{{ trigger.event.data.args | default([]) }}"
+      params: "{{ trigger.event.data.params | default({}) }}"
+      # Level cluster args (Zigbee uses 0–254 for 'level' and 1/10s for 'transition_time')
+      ev_level: >-
+        {% if 'level' in params %}{{ params.level }}
+        {% elif args|length>0 %}{{ args[0] }}
+        {% else %}{{ None }}{% endif %}
+      ev_tenths: >-
+        {% if 'transition_time' in params %}{{ params.transition_time }}
+        {% elif args|length>1 %}{{ args[1] }}
+        {% else %}{{ None }}{% endif %}
+      ev_sec: >-
+        {% set t = ev_tenths if ev_tenths is not none else onoff_sec*10 %}
+        {{ (t | float(0)) / 10 }}
+
+  - choose:
+      # Off / Up / Turn On to previous brightness (fade using switch's time)
+      - conditions: >
+          {{ cmd == 'button_2_press' and is_state(tgt, 'off') }}
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ tgt }}" }
+            data:
+              transition: "{{ onoff_sec }}"
+
+      # Off / Down / Turn on to minimum brightness
+      - conditions: >
+          {{ cmd == 'button_1_press' and is_state(tgt, 'off') }}
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ tgt }}" }
+            data:
+              brightness_pct: "{{ min_pct }}"
+              transition: "{{ onoff_sec }}"
+
+      # On / Up / Fade brightness to 100%
+      - conditions: >
+          {{ cmd == 'button_2_press' and is_state(tgt, 'on') }}
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ tgt }}" }
+            data:
+              brightness_pct: 100
+              transition: "{{ onoff_sec }}"
+
+      # On / Down / Turn off (fade using switch's time)
+      - conditions: >
+          {{ cmd == 'button_1_press' and is_state(tgt, 'on') }}
+        sequence:
+          - service: light.turn_off
+            target: { entity_id: "{{ tgt }}" }
+            data:
+              transition: "{{ onoff_sec }}"
+
+      # On / Hold (either Up or Down) → Use Level cluster's level + transition
+      # Many firmwares emit move_to_level_with_on_off with (level, transition_time) during holds.
+      - conditions: >
+          {{ cmd == 'move_to_level_with_on_off' and is_state(tgt, 'on') }}
+        sequence:
+          - service: light.turn_on
+            target: { entity_id: "{{ tgt }}" }
+            data:
+              brightness: "{{ ev_level if ev_level is not none else 254 }}"
+              transition: "{{ ev_sec }}"
+
+      # Release / Stop → optional final sync (mirror switch's final brightness)
+      - conditions: >
+          {{ do_final_sync
+             and ((trigger.id == 'zha' and cmd in ['button_1_release','button_2_release'])
+                  or trigger.id == 'zigbee_stop') }}
+        sequence:
+          - choose:
+              - conditions: "{{ sw_level_entity | length > 0 }}"
+                sequence:
+                  - service: homeassistant.update_entity
+                    target: { entity_id: "{{ sw_level_entity }}" }
+                  - delay:
+                      milliseconds: "{{ final_sync_delay_ms | int(120) }}"
+                  - variables:
+                      sw_lvl: "{{ state_attr(sw_level_entity,'brightness') | int(-1) }}"
+                  - choose:
+                      - conditions: "{{ sw_lvl == 0 }}"
+                        sequence:
+                          - service: light.turn_off
+                            target: { entity_id: "{{ tgt }}" }
+                            data: { transition: 0.05 }
+                      - conditions: "{{ sw_lvl > 0 }}"
+                        sequence:
+                          - service: light.turn_on
+                            target: { entity_id: "{{ tgt }}" }
+                            data:
+                              brightness: "{{ sw_lvl }}"
+                              transition: 0.05
+            default: []
+    default: []

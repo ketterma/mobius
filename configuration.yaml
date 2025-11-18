@@ -1,32 +1,29 @@
-
 # Loads default set of integrations. Do not remove.
 default_config:
-
-homeassistant:
-  media_dirs:
-    llmvision: /config/media/llmvision
 
 http:
   use_x_forwarded_for: true
   trusted_proxies:
-    - 172.30.33.0/24
+    - 192.168.64.0/20     # IoT VLAN (local network)
+    - 10.244.0.0/16       # Kubernetes pod network (Traefik)
+    - 192.168.64.1        # N5 bridge64 gateway
+
+openid:
+  client_id: 37ba4af8-ae81-406f-9756-c90a15707993
+  client_secret: tvRKAFRQhICR5JfOx7JJuy8MZQLHPxsz
+  configure_url: "https://auth.jaxon.cloud/.well-known/openid-configuration"
+  username_field: "preferred_username"
+  scope: "openid profile email"
+  block_login: false
+  openid_text: "Pocket ID"
 
 # Load frontend themes from the themes folder
 frontend:
   themes: !include_dir_merge_named themes
 
-# Text to speech
-tts:
-  - platform: google_translate
-
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
-
-# Wemo integration with manual IP configuration
-wemo:
-  static:
-    - 192.168.32.116
 
 # Timer helper for security lighting timeout
 timer:
@@ -34,4 +31,3 @@ timer:
     duration: "00:05:00"
     name: "Security Lights Timer"
     icon: mdi:timer-outline
-    
