@@ -34,7 +34,9 @@ spec:
             - name: VIKUNJA_DATABASE_TYPE
               value: "sqlite"
             - name: VIKUNJA_DATABASE_PATH
-              value: "/app/vikunja/vikunja.db"
+              value: "/data/vikunja.db"
+            - name: VIKUNJA_FILES_BASEPATH
+              value: "/data/files"
             - name: VIKUNJA_SERVICE_ENABLEREGISTRATION
               value: "false"
             - name: VIKUNJA_SERVICE_ENABLELINKSHARING
@@ -65,7 +67,7 @@ spec:
               memory: 512Mi
           volumeMounts:
             - name: data
-              mountPath: /app/vikunja
+              mountPath: /data
       volumes:
         - name: data
           persistentVolumeClaim:
