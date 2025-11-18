@@ -20,7 +20,40 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
   - PHX: `ssh root@85.31.234.30`
   - N5: `ssh jax@192.168.4.5` (passwordless sudo)
 - **Kubernetes:** `kubectl` contexts for both `phx-jaxon-cloud` and `homelab` clusters
+- **Home Assistant CLI:** `hass-cli` configured via `.env` file
+  - Install: `uv pip install homeassistant-cli`
+  - Load env: `source .env` or use `dotenv` tool
+  - Example: `hass-cli entity list light`
 - **Domain:** `jaxon.cloud` (Cloudflare DNS, public), `jaxon.home` (internal)
+
+### Home Assistant VM Access Layers
+
+The HAOS VM runs on N5 via libvirt/KVM. This is the "underlying hypervisor/host" for direct HAOS filesystem access.
+
+```
+N5 (Ubuntu) → libvirt (KVM) → HAOS → SSH Addon (container)
+```
+
+| Layer | Access Method | What You Get |
+|-------|--------------|--------------|
+| **N5 Host** | `ssh jax@192.168.4.5` | Ubuntu, libvirt, ZFS |
+| **HAOS VM** | `virsh qemu-agent-command HomeAssistant ...` | Direct HAOS filesystem |
+| **SSH Addon** | `ssh root@192.168.64.2` | Container with `ha` CLI, `/config` |
+
+**SSH Addon limitations**: You're inside an addon container, not the HAOS host. You have:
+- `ha` CLI for addon/system management
+- Access to `/config` (HA configuration)
+- No direct access to `/mnt/data/supervisor/` or other addons' data
+
+**Direct HAOS access** (for addon data, debugging):
+```bash
+# From N5, execute command in HAOS VM
+ssh jax@192.168.4.5 "sudo virsh qemu-agent-command HomeAssistant '{\"execute\":\"guest-exec\", \"arguments\":{\"path\":\"ls\", \"arg\":[\"/mnt/data/supervisor/addons/data\"], \"capture-output\":true}}'"
+
+# Get output (use PID from above)
+ssh jax@192.168.4.5 "sudo virsh qemu-agent-command HomeAssistant '{\"execute\":\"guest-exec-status\", \"arguments\":{\"pid\":PID}}'"
+# Output is base64 encoded in out-data field
+```
 
 ### Network (Multi-VLAN)
 - **VLAN 1** (192.168.4.0/24): Infrastructure - k0s nodes, SSH, services
@@ -70,6 +103,11 @@ Hybrid homelab infrastructure spanning on-premises Kubernetes cluster and cloud 
 - **`docs/lab-vm-haos.md`** - Home Assistant VM configuration and management
 - **`docs/jaxon-cloud-architecture.md`** - PHX cloud architecture and multi-cluster design
 - **`CLAUDE.md`** - This file (repository overview)
+
+### Environment
+- **`.env`** - Environment variables for CLI tools (gitignored)
+  - `HASS_TOKEN` - Home Assistant long-lived access token
+  - `HASS_SERVER` - Home Assistant URL (`http://192.168.64.2:8123`)
 
 ## Technologies
 

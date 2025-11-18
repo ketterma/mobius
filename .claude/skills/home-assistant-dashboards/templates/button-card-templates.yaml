@@ -1,0 +1,155 @@
+# Button-Card Templates
+# Add to top of your dashboard YAML
+
+button_card_templates:
+  # Base template with common styles
+  base:
+    styles:
+      card:
+        - border-radius: 12px
+        - padding: 12px
+      name:
+        - font-size: 14px
+      state:
+        - font-size: 12px
+        - color: var(--secondary-text-color)
+
+  # Light button with color feedback
+  light_button:
+    template: base
+    aspect_ratio: 1/1
+    show_state: true
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+    state:
+      - value: "on"
+        styles:
+          card:
+            - background-color: var(--primary-color)
+          icon:
+            - color: var(--primary-text-color)
+          name:
+            - color: var(--primary-text-color)
+      - value: "off"
+        styles:
+          card:
+            - background-color: var(--card-background-color)
+          icon:
+            - color: var(--primary-text-color)
+
+  # Climate button with temperature display
+  climate_button:
+    template: base
+    aspect_ratio: 1/1
+    show_state: false
+    tap_action:
+      action: more-info
+    custom_fields:
+      temp: >
+        [[[
+          return states[entity.entity_id].attributes.current_temperature + '°'
+        ]]]
+      target: >
+        [[[
+          return states[entity.entity_id].attributes.temperature + '°'
+        ]]]
+    styles:
+      custom_fields:
+        temp:
+          - font-size: 24px
+          - font-weight: bold
+        target:
+          - font-size: 14px
+          - color: var(--secondary-text-color)
+
+  # Cover button with position
+  cover_button:
+    template: base
+    aspect_ratio: 1/1
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+    show_state: false
+    custom_fields:
+      position: >
+        [[[
+          if (entity.state === 'open') {
+            return entity.attributes.current_position + '%'
+          }
+          return entity.state
+        ]]]
+    state:
+      - value: "open"
+        icon: mdi:garage-open
+        styles:
+          icon:
+            - color: var(--warning-color)
+      - value: "closed"
+        icon: mdi:garage
+        styles:
+          icon:
+            - color: var(--success-color)
+
+  # Media player button
+  media_button:
+    template: base
+    aspect_ratio: 2/1
+    show_state: true
+    tap_action:
+      action: more-info
+    state:
+      - value: "playing"
+        styles:
+          card:
+            - background-color: var(--primary-color)
+      - value: "paused"
+        icon: mdi:pause
+      - value: "idle"
+        icon: mdi:speaker
+      - value: "off"
+        icon: mdi:speaker-off
+
+  # Scene button (no state)
+  scene_button:
+    template: base
+    aspect_ratio: 1/1
+    show_state: false
+    tap_action:
+      action: call-service
+      service: scene.turn_on
+      service_data:
+        entity_id: "[[[ return entity.entity_id ]]]"
+    styles:
+      card:
+        - background-color: var(--card-background-color)
+      icon:
+        - color: var(--primary-color)
+    state:
+      - value: "on"
+        styles:
+          card:
+            - animation: blink 2s ease infinite
+
+# Usage Examples:
+#
+# cards:
+#   - type: custom:button-card
+#     template: light_button
+#     entity: light.bedroom
+#     name: Bedroom
+#     icon: mdi:bed
+#
+#   - type: custom:button-card
+#     template: climate_button
+#     entity: climate.living_room
+#     name: Living Room
+#     icon: mdi:thermometer
+#
+#   - type: custom:button-card
+#     template: scene_button
+#     entity: scene.movie_mode
+#     name: Movie
+#     icon: mdi:movie

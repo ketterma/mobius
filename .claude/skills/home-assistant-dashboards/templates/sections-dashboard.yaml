@@ -1,0 +1,120 @@
+# Sections View Dashboard Template
+# Save as dashboards/your-dashboard.yaml
+
+title: My Home
+views:
+  - title: Home
+    type: sections
+    path: home
+    icon: mdi:home
+    max_columns: 3  # 1-4 columns
+    # dense_section_placement: false  # Auto-fill gaps
+
+    sections:
+      # Living Room Section
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Living Room
+
+          - type: tile
+            entity: light.living_room_main
+            name: Main Light
+            features:
+              - type: light-brightness
+
+          - type: tile
+            entity: light.living_room_lamp
+            name: Lamp
+            color: amber
+            features:
+              - type: light-brightness
+              - type: light-color-temp
+
+          - type: tile
+            entity: climate.living_room
+            features:
+              - type: climate-hvac-modes
+                hvac_modes: [auto, heat, cool, "off"]
+              - type: target-temperature
+
+      # Kitchen Section
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Kitchen
+
+          - type: tile
+            entity: light.kitchen
+            features:
+              - type: light-brightness
+
+          - type: tile
+            entity: sensor.kitchen_temperature
+            color: cyan
+
+      # Security Section
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Security
+
+          - type: tile
+            entity: alarm_control_panel.home
+            features:
+              - type: alarm-modes
+                modes: [armed_home, armed_away, disarmed]
+
+          - type: tile
+            entity: lock.front_door
+
+          - type: tile
+            entity: cover.garage_door
+            features:
+              - type: cover-open-close
+
+  - title: Media
+    type: sections
+    path: media
+    icon: mdi:television
+    max_columns: 2
+
+    sections:
+      - type: grid
+        cards:
+          - type: tile
+            entity: media_player.living_room_tv
+            features:
+              - type: media-player-volume-slider
+
+          - type: tile
+            entity: media_player.bedroom_speaker
+            features:
+              - type: media-player-volume-slider
+
+  - title: Climate
+    type: sections
+    path: climate
+    icon: mdi:thermometer
+    max_columns: 2
+
+    sections:
+      - type: grid
+        cards:
+          - type: tile
+            entity: climate.living_room
+            name: Living Room
+            features:
+              - type: climate-hvac-modes
+                hvac_modes: [heat, cool, "off"]
+              - type: target-temperature
+              - type: climate-preset-modes
+                preset_modes: [home, eco, away]
+
+          - type: tile
+            entity: climate.bedroom
+            name: Bedroom
+            features:
+              - type: climate-hvac-modes
+                hvac_modes: [heat, cool, "off"]
+              - type: target-temperature

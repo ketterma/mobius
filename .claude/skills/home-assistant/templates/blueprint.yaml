@@ -1,0 +1,116 @@
+# Home Assistant Blueprint Template
+# Save as .yaml in config/blueprints/automation/
+
+blueprint:
+  name: "Blueprint Name"
+  description: |
+    Detailed description of what this blueprint does.
+
+    Supports **markdown** formatting.
+  domain: automation
+  author: "Your Name"
+
+  # Optional: minimum HA version
+  homeassistant:
+    min_version: "2024.1.0"
+
+  # Optional: source for updates
+  source_url: "https://github.com/user/repo/blob/main/blueprint.yaml"
+
+  input:
+    # Entity selector
+    motion_sensor:
+      name: "Motion Sensor"
+      description: "Sensor that triggers the automation"
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+            device_class: motion
+
+    # Target selector (supports areas, devices, entities)
+    target_light:
+      name: "Light"
+      description: "Light(s) to control"
+      selector:
+        target:
+          entity:
+            domain: light
+
+    # Number with slider
+    delay_seconds:
+      name: "Off Delay"
+      description: "Seconds to wait before turning off"
+      default: 120
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 10
+          unit_of_measurement: seconds
+          mode: slider
+
+    # Boolean toggle
+    notify_enabled:
+      name: "Send Notification"
+      description: "Send mobile notification when triggered"
+      default: false
+      selector:
+        boolean:
+
+    # Dropdown select
+    brightness_level:
+      name: "Brightness"
+      default: "medium"
+      selector:
+        select:
+          options:
+            - label: "Low"
+              value: "low"
+            - label: "Medium"
+              value: "medium"
+            - label: "High"
+              value: "high"
+
+# Variables to use inputs in templates
+variables:
+  notify_enabled: !input notify_enabled
+  brightness_level: !input brightness_level
+  brightness_value: >
+    {% if brightness_level == 'low' %}50
+    {% elif brightness_level == 'medium' %}150
+    {% else %}255{% endif %}
+
+triggers:
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: "on"
+
+conditions: []
+
+actions:
+  - action: light.turn_on
+    target: !input target_light
+    data:
+      brightness: "{{ brightness_value }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ notify_enabled }}"
+    then:
+      - action: notify.mobile_app
+        data:
+          message: "Motion detected, light turned on"
+
+  - wait_for_trigger:
+      - trigger: state
+        entity_id: !input motion_sensor
+        to: "off"
+
+  - delay:
+      seconds: !input delay_seconds
+
+  - action: light.turn_off
+    target: !input target_light
+
+mode: restart

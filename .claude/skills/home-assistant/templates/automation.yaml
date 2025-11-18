@@ -1,0 +1,92 @@
+# Home Assistant Automation Template
+# Copy and modify for your use case
+
+automation:
+  - id: "unique_id_here"
+    alias: "Descriptive Name"
+    description: "What this automation does"
+
+    # Mode: single (default), restart, queued, parallel
+    mode: restart
+
+    # Optional: max instances for queued/parallel modes
+    # max: 10
+
+    triggers:
+      # State change trigger
+      - trigger: state
+        entity_id: binary_sensor.motion
+        to: "on"
+        # from: "off"  # Optional
+        # for:         # Optional delay
+        #   minutes: 5
+        id: motion_detected  # For use in conditions/choose
+
+      # Time trigger
+      - trigger: time
+        at: "08:00:00"
+        id: morning
+
+      # Numeric threshold
+      - trigger: numeric_state
+        entity_id: sensor.temperature
+        above: 25
+        id: too_hot
+
+    conditions:
+      # Time window
+      - condition: time
+        after: "18:00:00"
+        before: "23:00:00"
+        weekday:
+          - mon
+          - tue
+          - wed
+          - thu
+          - fri
+
+      # Entity state
+      - condition: state
+        entity_id: input_boolean.automation_enabled
+        state: "on"
+
+      # Template (shorthand)
+      - "{{ states('sensor.battery')|int > 20 }}"
+
+    actions:
+      # Simple service call
+      - action: light.turn_on
+        target:
+          entity_id: light.living_room
+        data:
+          brightness_pct: 80
+          transition: 2
+
+      # Conditional action
+      - if:
+          - condition: trigger
+            id: motion_detected
+        then:
+          - action: notify.mobile_app
+            data:
+              message: "Motion detected!"
+        else:
+          - action: notify.mobile_app
+            data:
+              message: "Other trigger fired"
+
+      # Wait for condition
+      - wait_for_trigger:
+          - trigger: state
+            entity_id: binary_sensor.motion
+            to: "off"
+        timeout: "00:10:00"
+        continue_on_timeout: true
+
+      # Delay
+      - delay: "00:02:00"
+
+      # Final action
+      - action: light.turn_off
+        target:
+          entity_id: light.living_room

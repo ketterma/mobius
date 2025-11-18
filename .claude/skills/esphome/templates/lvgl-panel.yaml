@@ -1,0 +1,225 @@
+# LVGL Touch Panel Template
+# For ESP32-S3 with ILI9341/ST7789 display
+
+substitutions:
+  device_name: wall-panel
+  friendly_name: "Wall Panel"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${device_name}"
+    password: !secret fallback_password
+
+captive_portal:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  level: INFO
+
+# Display SPI bus
+spi:
+  clk_pin: GPIO12
+  mosi_pin: GPIO11
+
+# Display configuration
+display:
+  - platform: ili9xxx
+    model: ST7789V
+    id: my_display
+    cs_pin: GPIO10
+    dc_pin: GPIO9
+    reset_pin: GPIO8
+    dimensions:
+      height: 320
+      width: 240
+    auto_clear_enabled: false
+    update_interval: never
+
+# Backlight control
+output:
+  - platform: ledc
+    pin: GPIO45
+    id: backlight_pwm
+
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    name: "${friendly_name} Backlight"
+    id: backlight
+    default_transition_length: 500ms
+    restore_mode: ALWAYS_ON
+
+# Touch controller
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+
+touchscreen:
+  - platform: cst816
+    id: my_touch
+    interrupt_pin: GPIO5
+
+# Home Assistant sensors for display
+sensor:
+  - platform: homeassistant
+    id: living_room_temp
+    entity_id: sensor.living_room_temperature
+    on_value:
+      - lvgl.label.update:
+          id: temp_value
+          text: !lambda 'return str(x, 1) + "°C";'
+
+binary_sensor:
+  - platform: homeassistant
+    id: living_room_light
+    entity_id: light.living_room
+    on_state:
+      - lvgl.widget.update:
+          id: light_btn
+          state:
+            checked: !lambda 'return x;'
+
+# LVGL configuration
+lvgl:
+  displays:
+    - my_display
+  touchscreens:
+    - my_touch
+
+  # Theme
+  theme:
+    btn:
+      bg_color: 0x2196F3
+      text_color: 0xFFFFFF
+      radius: 8
+
+  # Screensaver timeout
+  on_idle:
+    timeout: 60s
+    then:
+      - lvgl.page.show: screensaver
+      - light.turn_on:
+          id: backlight
+          brightness: 10%
+
+  pages:
+    # Main control page
+    - id: main_page
+      widgets:
+        # Room name header
+        - label:
+            text: "Living Room"
+            align: TOP_MID
+            y: 10
+            text_font: montserrat_20
+
+        # Temperature display
+        - label:
+            id: temp_value
+            text: "--.-°C"
+            align: CENTER
+            y: -30
+            text_font: montserrat_36
+
+        # Light toggle button
+        - button:
+            id: light_btn
+            align: CENTER
+            y: 40
+            width: 120
+            height: 50
+            checkable: true
+            widgets:
+              - label:
+                  text: "Light"
+                  align: CENTER
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.living_room
+
+        # Brightness slider
+        - slider:
+            id: brightness_slider
+            align: BOTTOM_MID
+            y: -40
+            width: 180
+            min_value: 0
+            max_value: 255
+            on_value:
+              - homeassistant.service:
+                  service: light.turn_on
+                  data:
+                    entity_id: light.living_room
+                    brightness: !lambda 'return (int)x;'
+
+        # Scene buttons
+        - button:
+            align: BOTTOM_LEFT
+            x: 10
+            y: -10
+            width: 70
+            height: 40
+            widgets:
+              - label:
+                  text: "Movie"
+                  align: CENTER
+                  text_font: montserrat_14
+            on_press:
+              - homeassistant.service:
+                  service: scene.turn_on
+                  data:
+                    entity_id: scene.movie_mode
+
+        - button:
+            align: BOTTOM_RIGHT
+            x: -10
+            y: -10
+            width: 70
+            height: 40
+            widgets:
+              - label:
+                  text: "Off"
+                  align: CENTER
+                  text_font: montserrat_14
+            on_press:
+              - homeassistant.service:
+                  service: light.turn_off
+                  data:
+                    entity_id: all
+
+    # Screensaver (blank)
+    - id: screensaver
+      widgets:
+        - obj:
+            bg_color: 0x000000
+            width: 100%
+            height: 100%
+            on_press:
+              - lvgl.page.show: main_page
+              - light.turn_on:
+                  id: backlight
+                  brightness: 100%
