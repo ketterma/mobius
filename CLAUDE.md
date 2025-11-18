@@ -44,6 +44,80 @@ Reusable automation and script templates:
 - `automation/homeassistant/notify_leaving_zone.yaml` - Zone departure notifications
 - `script/homeassistant/confirmable_notification.yaml` - Confirmation-based notifications
 
+## Accessing Home Assistant
+
+### SSH Access (Terminal & SSH Addon)
+```bash
+# SSH to HA CLI (this is the SSH addon container, NOT the host OS)
+ssh root@192.168.64.2
+
+# You're in a container with ha CLI and mounted filesystems
+# Config directory: /homeassistant
+# Addon configs: /addon_configs
+```
+
+**Important:** When you SSH in, you're in the Terminal & SSH addon container, not the actual HAOS host. You have access to the `ha` CLI and mounted filesystems, but not the real host OS.
+
+### Home Assistant CLI Commands
+```bash
+# List addons and their states
+ha addons list
+
+# Get addon logs
+ha addons logs core_git_pull
+
+# Start/stop/restart addons
+ha addons start core_git_pull
+ha addons stop core_git_pull
+ha addons restart core_git_pull
+
+# Check core status
+ha core check
+ha core info
+
+# Restart Home Assistant
+ha core restart
+```
+
+### Standard API (Port 8123)
+Uses long-lived access tokens created in HA UI (Profile → Long-lived access tokens).
+
+```bash
+# Token stored in .env as HASS_TOKEN
+curl -H "Authorization: Bearer $HASS_TOKEN" \
+  "http://192.168.64.2:8123/api/states"
+
+# Check API status
+curl -H "Authorization: Bearer $HASS_TOKEN" \
+  "http://192.168.64.2:8123/api/"
+```
+
+### Supervisor API (Port 80 via Remote API Proxy)
+Requires the Remote API proxy addon from `https://github.com/home-assistant-ecosystem/home-assistant-remote`.
+
+```bash
+# Get the Supervisor token from addon logs
+ha addons logs 77f1785d_remote_api | grep "API Key"
+
+# Use that token to call Supervisor API
+curl -H "Authorization: Bearer <supervisor-token>" \
+  "http://192.168.64.2:80/addons"
+
+# Get addon info
+curl -H "Authorization: Bearer <supervisor-token>" \
+  "http://192.168.64.2:80/addons/core_git_pull/info"
+```
+
+### Host OS Access (Rare)
+If you absolutely need host OS access, you can use virsh from N5:
+```bash
+ssh jax@192.168.4.5
+sudo virsh console HomeAssistant
+# Login as root (no password on HAOS)
+```
+
+This should be rare since the SSH addon provides CLI access and most operations can be done via the APIs.
+
 ## Development Commands
 
 Home Assistant doesn't use traditional build/test commands. Instead:
