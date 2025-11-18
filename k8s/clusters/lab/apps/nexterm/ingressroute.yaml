@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nexterm-https
+  namespace: nexterm
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: term.jaxon.cloud
+    external-dns.alpha.kubernetes.io/target: 192.168.8.50
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`term.jaxon.cloud`)
+      kind: Rule
+      services:
+        - name: nexterm
+          port: 80
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: term.jaxon.cloud
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nexterm-http
+  namespace: nexterm
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`term.jaxon.cloud`)
+      kind: Rule
+      services:
+        - name: nexterm
+          port: 80
