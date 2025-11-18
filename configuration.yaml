@@ -33,3 +33,39 @@ timer:
     icon: mdi:timer-outline
 
 # GitOps test - Mon Nov 17 23:23:10 PST 2025
+
+# Light groups for Inovelli switch automations
+light:
+  - platform: group
+    name: Main Bathroom Vanity
+    entities:
+      - light.hue_color_downlight_5_3   # Bathroom South
+      - light.hue_color_downlight_8     # Shower South
+      - light.hue_color_downlight_6     # Shower North
+      - light.hue_color_downlight_7     # Bathroom Center
+      - light.hue_color_downlight_5_2   # Bathroom North
+  - platform: group
+    name: Main Bathroom Perifo
+    entities:
+      - light.perifo_cylinder_spot_1
+      - light.perifo_cylinder_spot_2
+      - light.perifo_cylinder_spot_3
+  - platform: group
+    name: Main Closet
+    entities:
+      - light.hue_color_downlight_1_2   # Closet 1
+      - light.hue_color_downlight_5_5   # Main Closet 2
+  - platform: group
+    name: Main Bedroom Lights
+    entities:
+      - light.hue_color_downlight_4_2   # Hue color downlight 4
+      - light.hue_color_downlight_3_2   # Hue color downlight 2
+      - light.hue_color_downlight_1_4   # Hue color downlight 1
+      - light.hue_color_downlight_2_2   # Hue color downlight 3
+  - platform: group
+    name: Dymera Lights
+    entities:
+      - light.dymera_1
+      - light.dymera_1_2
+      - light.dymera_2
+      - light.dymera_2_2

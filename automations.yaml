@@ -114,3 +114,63 @@
       target_light: light.hue_color_downlight_1_3
       onoff_transition_number: number.main_bathroom_water_closet_switch_on_off_transition_time
       switch_level_entity: light.main_bathroom_water_closet_switch
+- id: '1731916800000'
+  alias: Main Bathroom Switch
+  description: ''
+  use_blueprint:
+    path: jax/inovelli_hue.yaml
+    input:
+      controller: 0d0e7c87550b66a1c07df4344ce9349e
+      target_light: light.main_bathroom_vanity
+      onoff_transition_number: number.bathroom_on_off_transition_time
+      switch_level_entity: light.bathroom
+- id: '1731916800001'
+  alias: Main Bathroom Perifo Switch
+  description: ''
+  use_blueprint:
+    path: jax/inovelli_hue.yaml
+    input:
+      controller: 3f1f8dfa89f98cb2c60583343be18116
+      target_light: light.main_bathroom_perifo
+      onoff_transition_number: number.inovelli_vzm31_sn_on_off_transition_time
+      switch_level_entity: light.inovelli_vzm31_sn
+- id: '1731916800002'
+  alias: Main Bedroom Switch (Primary)
+  description: ''
+  use_blueprint:
+    path: jax/inovelli_hue.yaml
+    input:
+      controller: a4725fafbb5c890f438fdbb217e5a065
+      target_light: light.main_bedroom_lights
+      onoff_transition_number: number.bedroom_on_off_transition_time
+      switch_level_entity: light.bedroom
+- id: '1731916800003'
+  alias: Main Bedroom Switch (Secondary)
+  description: ''
+  use_blueprint:
+    path: jax/inovelli_hue.yaml
+    input:
+      controller: 239dc029b9f00153b39c5de09bbbb95a
+      target_light: light.main_bedroom_lights
+      onoff_transition_number: number.bedroom_secondary_on_off_transition_time
+      switch_level_entity: light.bedroom_secondary
+- id: '1731916800004'
+  alias: Main Closet Switch
+  description: ''
+  use_blueprint:
+    path: jax/inovelli_hue.yaml
+    input:
+      controller: 412a521173c99cf910da6d89f4914475
+      target_light: light.main_closet
+      onoff_transition_number: number.closet_lights_on_off_transition_time
+      switch_level_entity: light.closet_lights
+- id: '1731916800005'
+  alias: Bedroom Door Switch
+  description: ''
+  use_blueprint:
+    path: jax/inovelli_hue.yaml
+    input:
+      controller: 1e966c43e80dfef9fa3847bea99dff45
+      target_light: light.dymera_lights
+      onoff_transition_number: number.bedroom_door_on_off_transition_time
+      switch_level_entity: light.bedroom_door
