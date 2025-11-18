@@ -17,8 +17,6 @@ spec:
         app.kubernetes.io/name: nexterm
         app.kubernetes.io/instance: nexterm
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: n5
       containers:
         - name: nexterm
           image: germannewsmaker/nexterm:1.0.5-OPEN-PREVIEW
