@@ -7,5 +7,5 @@ resources:
   - pocket-id
   - unifi
   - nexterm
-  - claude-code-ui
   - vikunja
+  # - claude-code-ui  # TODO: uncomment when ready to deploy
