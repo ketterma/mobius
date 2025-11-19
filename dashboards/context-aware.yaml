@@ -1,58 +1,24 @@
 title: Home
 views:
-  - title: Overview
-    path: overview
-    icon: mdi:home
-    type: sections
-    sections:
-      # Alerts & Tasks Section
-      - title: Alerts & Tasks
-        cards:
-          # Household Chores Todo List
-          - type: todo-list
-            entity: todo.household_chores
-            title: Household Chores
-
-      # Pet Status Section
-      - title: Pet Care
-        cards:
-          - type: custom:mushroom-entity-card
-            entity: sensor.shadow_feeder_times_eaten
-            name: "Times Eaten Today"
-            icon_color: orange
-
-          - type: custom:mushroom-entity-card
-            entity: sensor.shadow_feeder_desiccant_left_days
-            name: "Desiccant Days Left"
-
-          - type: custom:mushroom-entity-card
-            entity: sensor.shadow_feeder_average_eating_time
-            name: "Avg Eating Time"
-            icon_color: green
-
-      # Quick Controls Section
-      - title: Quick Controls
-        cards:
-          - type: custom:mushroom-light-card
-            entity: light.main_bedroom_lights
-            name: "Bedroom"
-            use_light_color: true
-            show_brightness_control: true
-            collapsible_controls: true
-
-          - type: custom:mushroom-light-card
-            entity: light.main_bathroom_vanity
-            name: "Bathroom"
-            use_light_color: true
-            show_brightness_control: true
-            collapsible_controls: true
-
-          - type: custom:mushroom-light-card
-            entity: light.dymera_lights
-            name: "Dymera"
-            use_light_color: true
-            show_brightness_control: true
-            collapsible_controls: true
+  - title: Batteries
+    path: batteries
+    icon: mdi:battery
+    cards:
+      - type: custom:auto-entities
+        card:
+          type: entities
+          title: All Batteries
+        filter:
+          include:
+            - attributes:
+                device_class: battery
+          exclude:
+            - state: unavailable
+            - state: unknown
+        sort:
+          method: state
+          numeric: true
+          reverse: false
 
   - title: Chores
     path: chores
