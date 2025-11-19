@@ -17,8 +17,8 @@ views:
       - title: Pet Care
         cards:
           - type: custom:mushroom-entity-card
-            entity: sensor.eversweet_3_pro_purified_water
-            name: "Water Purified Today"
+            entity: sensor.eversweet_3_pro_filter_remaining
+            name: "Filter Remaining"
             icon_color: blue
 
           - type: custom:mushroom-entity-card
