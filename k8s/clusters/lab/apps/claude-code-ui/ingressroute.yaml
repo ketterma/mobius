@@ -5,13 +5,13 @@ metadata:
   name: claude-code-ui
   namespace: traefik
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: claude-ui.jaxon.home
+    external-dns.alpha.kubernetes.io/hostname: claude-ui.jaxon.cloud
     external-dns.alpha.kubernetes.io/target: 192.168.8.50
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`claude-ui.jaxon.home`)
+    - match: Host(`claude-ui.jaxon.cloud`)
       kind: Rule
       services:
         - name: claude-code-ui
