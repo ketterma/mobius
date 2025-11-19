@@ -104,13 +104,21 @@ jobs:
     steps:
       - name: Notify via Pushover
         run: |
-          if [ "${{ needs.deploy-lab.result }}" = "success" ] && [ "${{ needs.deploy-phx.result }}" = "success" ]; then
+          LAB_RESULT="${{ needs.deploy-lab.result }}"
+          PHX_RESULT="${{ needs.deploy-phx.result }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "$LAB_RESULT" = "success" ] && [ "$PHX_RESULT" = "success" ]; then
             TITLE="✅ Deploy Succeeded"
-            MESSAGE="Lab and PHX clusters deployed successfully"
+            MESSAGE="Lab ✓ PHX ✓"
             PRIORITY=0
           else
             TITLE="❌ Deploy Failed"
-            MESSAGE="Lab: ${{ needs.deploy-lab.result }}, PHX: ${{ needs.deploy-phx.result }}"
+            # Build detailed failure message
+            MSG=""
+            [ "$LAB_RESULT" != "success" ] && MSG="Lab: $LAB_RESULT"
+            [ "$PHX_RESULT" != "success" ] && MSG="$MSG${MSG:+, }PHX: $PHX_RESULT"
+            MESSAGE="$MSG"
             PRIORITY=1
           fi
 
@@ -119,4 +127,6 @@ jobs:
             -d "user=${{ secrets.PUSHOVER_USER }}" \
             -d "title=$TITLE" \
             -d "message=$MESSAGE" \
+            -d "url=$RUN_URL" \
+            -d "url_title=View Run" \
             -d "priority=$PRIORITY"
