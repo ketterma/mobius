@@ -90,8 +90,8 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config-phx
           export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
 
-          # Decrypt all SOPS files in-place (ignore MAC for corrupted files)
-          find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i --ignore-mac {} \;
+          # Decrypt all SOPS files in-place
+          find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i {} \;
 
           kubectl apply -k k8s/clusters/phx/infrastructure
           kubectl apply -k k8s/clusters/phx/infrastructure-config
