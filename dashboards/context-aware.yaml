@@ -17,11 +17,6 @@ views:
       - title: Pet Care
         cards:
           - type: custom:mushroom-entity-card
-            entity: sensor.eversweet_3_pro_filter_remaining
-            name: "Filter Remaining"
-            icon_color: blue
-
-          - type: custom:mushroom-entity-card
             entity: sensor.shadow_feeder_times_eaten
             name: "Times Eaten Today"
             icon_color: orange
@@ -29,6 +24,11 @@ views:
           - type: custom:mushroom-entity-card
             entity: sensor.shadow_feeder_desiccant_left_days
             name: "Desiccant Days Left"
+
+          - type: custom:mushroom-entity-card
+            entity: sensor.shadow_feeder_average_eating_time
+            name: "Avg Eating Time"
+            icon_color: green
 
       # Quick Controls Section
       - title: Quick Controls
