@@ -183,13 +183,6 @@
     - trigger: state
       entity_id: binary_sensor.eversweet_3_pro_water_lack_warning
       to: "on"
-  conditions:
-    - condition: not
-      conditions:
-        - condition: state
-          entity_id: todo.household_chores
-          attribute: items
-          value: "Refill water fountain"
   actions:
     - action: todo.add_item
       target:
