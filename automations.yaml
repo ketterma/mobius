@@ -174,3 +174,124 @@
       target_light: light.dymera_lights
       onoff_transition_number: number.bedroom_door_on_off_transition_time
       switch_level_entity: light.bedroom_door
+
+# Sensor-triggered chore tasks
+- id: chore_water_fountain_low
+  alias: "Chore - Water fountain low"
+  description: Create task when water fountain needs refilling
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.eversweet_3_pro_water_lack_warning
+      to: "on"
+  conditions:
+    - condition: not
+      conditions:
+        - condition: state
+          entity_id: todo.household_chores
+          attribute: items
+          value: "Refill water fountain"
+  actions:
+    - action: todo.add_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Refill water fountain"
+  mode: single
+
+- id: chore_water_fountain_filter
+  alias: "Chore - Water fountain filter"
+  description: Create task when fountain filter needs replacement
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.eversweet_3_pro_replace_filter
+      to: "on"
+  actions:
+    - action: todo.add_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Replace fountain filter"
+  mode: single
+
+- id: chore_cat_food_low_hopper1
+  alias: "Chore - Cat food low (hopper 1)"
+  description: Create task when feeder hopper 1 is low
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.shadow_feeder_food_level_hopper_1
+      to: "off"
+  actions:
+    - action: todo.add_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Refill cat food (hopper 1)"
+  mode: single
+
+- id: chore_cat_food_low_hopper2
+  alias: "Chore - Cat food low (hopper 2)"
+  description: Create task when feeder hopper 2 is low
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.shadow_feeder_food_level_hopper_2
+      to: "off"
+  actions:
+    - action: todo.add_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Refill cat food (hopper 2)"
+  mode: single
+
+- id: chore_feeder_desiccant
+  alias: "Chore - Feeder desiccant low"
+  description: Create task when feeder desiccant needs replacement
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.shadow_feeder_desiccant_left_days
+      below: 3
+  actions:
+    - action: todo.add_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Replace feeder desiccant"
+  mode: single
+
+# NFC tag automations for clearing tasks
+# Set tag_id after scanning tags with HA Companion app
+- id: nfc_clear_litter_box
+  alias: "NFC - Clear litter box task"
+  description: Mark litter box task complete when NFC tag scanned
+  triggers:
+    - trigger: tag
+      tag_id: "REPLACE_WITH_LITTER_BOX_TAG_ID"
+  actions:
+    - action: todo.update_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Replace litter"
+        status: completed
+    - action: todo.update_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Replace litter pad"
+        status: completed
+  mode: single
+
+- id: nfc_clear_trash
+  alias: "NFC - Clear trash task"
+  description: Mark trash task complete when NFC tag scanned
+  triggers:
+    - trigger: tag
+      tag_id: "REPLACE_WITH_TRASH_TAG_ID"
+  actions:
+    - action: todo.update_item
+      target:
+        entity_id: todo.household_chores
+      data:
+        item: "Take trash to street"
+        status: completed
+  mode: single
