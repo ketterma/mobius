@@ -1,0 +1,110 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-runner
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-runner
+  namespace: github-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: github-runner
+  template:
+    metadata:
+      labels:
+        app: github-runner
+    spec:
+      containers:
+        - name: runner
+          image: myoung34/github-runner:latest
+          env:
+            - name: RUNNER_NAME
+              value: phx-runner
+            - name: RUNNER_SCOPE
+              value: repo
+            - name: REPO_URL
+              value: https://github.com/ketterma/mobius
+            - name: LABELS
+              value: self-hosted,phx
+            - name: ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-token
+                  key: token
+            - name: RUNNER_WORKDIR
+              value: /tmp/runner
+            - name: DISABLE_AUTO_UPDATE
+              value: "true"
+          volumeMounts:
+            - name: kubeconfig-lab
+              mountPath: /home/runner/.kube/config-lab
+              subPath: config
+              readOnly: true
+            - name: kubeconfig-phx
+              mountPath: /home/runner/.kube/config-phx
+              subPath: config
+              readOnly: true
+            - name: age-key
+              mountPath: /home/runner/.age
+              readOnly: true
+            - name: runner-scripts
+              mountPath: /home/runner/scripts
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+      volumes:
+        - name: kubeconfig-lab
+          secret:
+            secretName: kubeconfig-lab
+        - name: kubeconfig-phx
+          secret:
+            secretName: kubeconfig-phx
+        - name: age-key
+          secret:
+            secretName: age-key
+        - name: runner-scripts
+          configMap:
+            name: runner-scripts
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runner-scripts
+  namespace: github-runner
+data:
+  deploy-lab.sh: |
+    #!/bin/bash
+    set -e
+    export KUBECONFIG=/home/runner/.kube/config-lab
+    export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+
+    # Install sops if not present
+    if ! command -v sops &> /dev/null; then
+      curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+      chmod +x sops-v3.8.1.linux.amd64
+      sudo mv sops-v3.8.1.linux.amd64 /usr/local/bin/sops
+    fi
+
+    cd "$GITHUB_WORKSPACE"
+    kubectl apply -k k8s/clusters/lab/infrastructure-config
+    kubectl apply -k k8s/clusters/lab/apps
+
+  deploy-phx.sh: |
+    #!/bin/bash
+    set -e
+    export KUBECONFIG=/home/runner/.kube/config-phx
+    export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+
+    cd "$GITHUB_WORKSPACE"
+    kubectl apply -k k8s/clusters/phx/infrastructure
+    kubectl apply -k k8s/clusters/phx/infrastructure-config

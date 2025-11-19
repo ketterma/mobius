@@ -1,0 +1,37 @@
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'k8s/**'
+  workflow_dispatch:
+
+jobs:
+  deploy-lab:
+    name: Deploy to Lab Cluster
+    runs-on: [self-hosted, phx]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Lab
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config-lab
+          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+          kubectl apply -k k8s/clusters/lab/infrastructure-config
+          kubectl apply -k k8s/clusters/lab/apps
+
+  deploy-phx:
+    name: Deploy to PHX Cluster
+    runs-on: [self-hosted, phx]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to PHX
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config-phx
+          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+          kubectl apply -k k8s/clusters/phx/infrastructure
+          kubectl apply -k k8s/clusters/phx/infrastructure-config
