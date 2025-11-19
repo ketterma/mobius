@@ -8,25 +8,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-lab:
-    name: Deploy to Lab Cluster
-    runs-on: [self-hosted, phx]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-
-      - name: Deploy to Lab
-        run: |
-          export KUBECONFIG=/home/runner/.kube/config-lab
-          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
-          kubectl apply -k k8s/clusters/lab/infrastructure-config
-          kubectl apply -k k8s/clusters/lab/apps
+  # TODO: Enable once Twingate resource for 192.168.4.5:6443 is configured
+  # deploy-lab:
+  #   name: Deploy to Lab Cluster
+  #   runs-on: [self-hosted, phx]
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install kubectl
+  #       run: |
+  #         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  #         chmod +x kubectl
+  #         sudo mv kubectl /usr/local/bin/
+  #
+  #     - name: Deploy to Lab
+  #       run: |
+  #         export KUBECONFIG=/home/runner/.kube/config-lab
+  #         export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+  #         kubectl apply -k k8s/clusters/lab/infrastructure-config
+  #         kubectl apply -k k8s/clusters/lab/apps
 
   deploy-phx:
     name: Deploy to PHX Cluster

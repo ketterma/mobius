@@ -19,6 +19,8 @@ spec:
       labels:
         app: github-runner
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: runner
           image: myoung34/github-runner:latest
