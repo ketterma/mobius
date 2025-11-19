@@ -1,0 +1,46 @@
+# Template sensors for alert states
+- sensor:
+    - name: "Active Alerts Count"
+      unique_id: active_alerts_count
+      state: >
+        {% set alerts = namespace(count=0) %}
+        {% if is_state('binary_sensor.eversweet_3_pro_water_lack_warning', 'on') %}
+          {% set alerts.count = alerts.count + 1 %}
+        {% endif %}
+        {% if is_state('binary_sensor.eversweet_3_pro_replace_filter', 'on') %}
+          {% set alerts.count = alerts.count + 1 %}
+        {% endif %}
+        {% if is_state('binary_sensor.shadow_feeder_food_level_hopper_1', 'off') %}
+          {% set alerts.count = alerts.count + 1 %}
+        {% endif %}
+        {% if is_state('binary_sensor.shadow_feeder_food_level_hopper_2', 'off') %}
+          {% set alerts.count = alerts.count + 1 %}
+        {% endif %}
+        {% if states('sensor.shadow_feeder_desiccant_left_days') | int(0) < 3 %}
+          {% set alerts.count = alerts.count + 1 %}
+        {% endif %}
+        {{ alerts.count }}
+      icon: mdi:alert-circle-outline
+
+    - name: "Pending Chores Count"
+      unique_id: pending_chores_count
+      state: "{{ states('todo.household_chores') }}"
+      icon: mdi:clipboard-check-outline
+
+- binary_sensor:
+    - name: "Water Fountain Needs Attention"
+      unique_id: water_fountain_needs_attention
+      state: >
+        {{ is_state('binary_sensor.eversweet_3_pro_water_lack_warning', 'on') or
+           is_state('binary_sensor.eversweet_3_pro_replace_filter', 'on') }}
+      device_class: problem
+      icon: mdi:cup-water
+
+    - name: "Cat Feeder Needs Attention"
+      unique_id: cat_feeder_needs_attention
+      state: >
+        {{ is_state('binary_sensor.shadow_feeder_food_level_hopper_1', 'off') or
+           is_state('binary_sensor.shadow_feeder_food_level_hopper_2', 'off') or
+           states('sensor.shadow_feeder_desiccant_left_days') | int(0) < 3 }}
+      device_class: problem
+      icon: mdi:cat

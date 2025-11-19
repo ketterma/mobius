@@ -1,0 +1,10 @@
+# Alert priority system for context-aware dashboard
+home_alert_priority:
+  name: "Home Alert Priority"
+  options:
+    - none
+    - info
+    - warning
+    - critical
+  initial: none
+  icon: mdi:alert-circle
