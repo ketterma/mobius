@@ -8,26 +8,49 @@ on:
   workflow_dispatch:
 
 jobs:
-  # TODO: Enable once Twingate resource for 192.168.4.5:6443 is configured
-  # deploy-lab:
-  #   name: Deploy to Lab Cluster
-  #   runs-on: [self-hosted, phx]
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Install kubectl
-  #       run: |
-  #         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-  #         chmod +x kubectl
-  #         sudo mv kubectl /usr/local/bin/
-  #
-  #     - name: Deploy to Lab
-  #       run: |
-  #         export KUBECONFIG=/home/runner/.kube/config-lab
-  #         export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
-  #         kubectl apply -k k8s/clusters/lab/infrastructure-config
-  #         kubectl apply -k k8s/clusters/lab/apps
+  deploy-lab:
+    name: Deploy to Lab Cluster
+    runs-on: [self-hosted, phx]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin
+          key: tools-${{ runner.os }}-v1
+
+      - name: Install tools
+        run: |
+          mkdir -p ~/.local/bin
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Install kubectl if not cached
+          if [ ! -f ~/.local/bin/kubectl ]; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mv kubectl ~/.local/bin/
+          fi
+
+          # Install sops if not cached
+          if [ ! -f ~/.local/bin/sops ]; then
+            curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+            chmod +x sops-v3.9.0.linux.amd64
+            mv sops-v3.9.0.linux.amd64 ~/.local/bin/sops
+          fi
+
+      - name: Deploy to Lab
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-lab
+          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+
+          # Decrypt all SOPS files in-place
+          find k8s/clusters/lab -name "*.sops.yaml" -exec sops -d -i {} \;
+
+          kubectl apply -k k8s/clusters/lab/infrastructure-config
+          kubectl apply -k k8s/clusters/lab/apps
 
   deploy-phx:
     name: Deploy to PHX Cluster
@@ -36,15 +59,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install kubectl
+      - name: Cache tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin
+          key: tools-${{ runner.os }}-v1
+
+      - name: Install tools
         run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
+          mkdir -p ~/.local/bin
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Install kubectl if not cached
+          if [ ! -f ~/.local/bin/kubectl ]; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mv kubectl ~/.local/bin/
+          fi
+
+          # Install sops if not cached
+          if [ ! -f ~/.local/bin/sops ]; then
+            curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+            chmod +x sops-v3.9.0.linux.amd64
+            mv sops-v3.9.0.linux.amd64 ~/.local/bin/sops
+          fi
 
       - name: Deploy to PHX
         run: |
+          export PATH="$HOME/.local/bin:$PATH"
           export KUBECONFIG=/home/runner/.kube/config-phx
           export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+
+          # Decrypt all SOPS files in-place
+          find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i {} \;
+
           kubectl apply -k k8s/clusters/phx/infrastructure
           kubectl apply -k k8s/clusters/phx/infrastructure-config
