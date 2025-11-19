@@ -71,4 +71,30 @@ ha addons logs core_git_pull
 3. Git pull addon updates `/homeassistant`
 4. Manual reload needed for changes to take effect
 
+### CRITICAL: Check for Local Changes Before Force Updates
+
+**NEVER use `git reset --hard` or force push without checking for local changes first!**
+
+If git pull addon fails, check why before forcing:
+```bash
+# SSH to HA and check status
+ssh root@192.168.64.2 "cd /config && git status"
+
+# If there are local changes, either:
+# 1. Sync them back to your local repo first
+scp root@192.168.64.2:/config/automations.yaml homeassistant/
+# 2. Or stash them if they're test changes
+ssh root@192.168.64.2 "cd /config && git stash"
+
+# Then pull safely
+ssh root@192.168.64.2 "cd /config && git pull origin homeassistant"
+```
+
+Local changes can come from:
+- UI-created automations
+- Config edits via File Editor addon
+- Testing/debugging changes
+
+ZFS hourly snapshots can recover lost changes if needed.
+
 See `docs/ha-api-reference.md` for detailed API examples.
