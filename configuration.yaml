@@ -21,16 +21,16 @@ openid:
 frontend:
   themes: !include_dir_merge_named themes
 
-# YAML-managed dashboards
-lovelace:
-  mode: storage
-  dashboards:
-    context-aware:
-      mode: yaml
-      title: Context Aware
-      icon: mdi:home-automation
-      show_in_sidebar: true
-      filename: dashboards/context-aware.yaml
+# YAML-managed dashboards (disabled for now)
+# lovelace:
+#   mode: storage
+#   dashboards:
+#     context-aware:
+#       mode: yaml
+#       title: Context Aware
+#       icon: mdi:home-automation
+#       show_in_sidebar: true
+#       filename: dashboards/context-aware.yaml
 
 automation: !include automations.yaml
 script: !include scripts.yaml
