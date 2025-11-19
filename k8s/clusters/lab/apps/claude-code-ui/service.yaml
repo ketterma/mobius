@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-code-ui
+  namespace: traefik
+spec:
+  type: ClusterIP
+  selector:
+    app: claude-code-ui
+  ports:
+    - name: http
+      port: 3001
+      protocol: TCP
+      targetPort: 3001

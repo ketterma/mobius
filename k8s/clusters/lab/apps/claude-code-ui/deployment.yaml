@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-code-ui
+  namespace: traefik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claude-code-ui
+  template:
+    metadata:
+      labels:
+        app: claude-code-ui
+    spec:
+      containers:
+        - name: claude-code-ui
+          image: node:20
+          command:
+            - sh
+            - -c
+            - |
+              apt-get update && apt-get install -y python3 build-essential && \
+              npm install -g @anthropic-ai/claude-code @siteboon/claude-code-ui && \
+              claude-code-ui
+          ports:
+            - containerPort: 3001
+          volumeMounts:
+            - name: claude-config
+              mountPath: /root/.claude
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+      volumes:
+        - name: claude-config
+          persistentVolumeClaim:
+            claimName: claude-code-ui-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: claude-code-ui-config
+  namespace: traefik
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-zfs-homelab
+  resources:
+    requests:
+      storage: 100Mi

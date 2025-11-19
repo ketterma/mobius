@@ -1,0 +1,20 @@
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: claude-code-ui
+  namespace: traefik
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: claude-ui.jaxon.home
+    external-dns.alpha.kubernetes.io/target: 192.168.8.50
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`claude-ui.jaxon.home`)
+      kind: Rule
+      services:
+        - name: claude-code-ui
+          port: 3001
+  tls:
+    certResolver: letsencrypt

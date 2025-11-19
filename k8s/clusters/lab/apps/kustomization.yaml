@@ -8,4 +8,4 @@ resources:
   - unifi
   - nexterm
   - vikunja
-  # - claude-code-ui  # TODO: uncomment when ready to deploy
+  - claude-code-ui
