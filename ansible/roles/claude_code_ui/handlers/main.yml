@@ -1,0 +1,5 @@
+---
+- name: restart container
+  community.general.lxd_container:
+    name: "{{ container_name }}"
+    state: restarted

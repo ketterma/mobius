@@ -1,6 +1,6 @@
 ---
 name: home-assistant
-description: "Home Assistant automation, REST API, Supervisor API, hass-cli, service calls, triggers, conditions, actions, blueprints, Inovelli LED, Hue scenes, WLED effects. Use for creating automations, calling services, managing devices."
+description: "MUST USE THIS SKILL when accessing Home Assistant via API. Home Assistant automation, REST API, Supervisor API, hass-cli, service calls, triggers, conditions, actions, blueprints, Inovelli LED, Hue scenes, WLED effects. Use for creating automations, calling services, managing devices."
 ---
 
 # Home Assistant

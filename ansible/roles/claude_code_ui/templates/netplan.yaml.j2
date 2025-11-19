@@ -1,0 +1,12 @@
+network:
+  version: 2
+  ethernets:
+    eth0:
+      addresses:
+        - {{ container_ip }}/{{ container_netmask }}
+      routes:
+        - to: default
+          via: {{ container_gateway }}
+      nameservers:
+        addresses:
+          - {{ container_dns }}

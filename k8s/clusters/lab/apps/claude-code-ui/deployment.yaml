@@ -6,6 +6,8 @@ metadata:
   namespace: traefik
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: claude-code-ui

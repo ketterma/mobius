@@ -1,0 +1,193 @@
+---
+# Install and configure LXD
+- name: Install LXD via snap
+  community.general.snap:
+    name: lxd
+    state: present
+
+- name: Add user to lxd group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: lxd
+    append: yes
+
+- name: Check if LXD is initialized
+  ansible.builtin.command: lxc storage list --format csv
+  register: lxd_storage_check
+  changed_when: false
+  failed_when: false
+
+- name: Initialize LXD with ZFS storage
+  ansible.builtin.command: >
+    lxd init --preseed
+  args:
+    stdin: |
+      config: {}
+      networks: []
+      storage_pools:
+        - name: {{ lxd_storage_pool }}
+          driver: zfs
+          config:
+            source: {{ lxd_zfs_pool }}
+      profiles:
+        - name: default
+          config: {}
+          devices:
+            root:
+              path: /
+              pool: {{ lxd_storage_pool }}
+              type: disk
+      cluster: null
+  when: lxd_storage_pool not in lxd_storage_check.stdout
+
+# Create ZFS dataset if it doesn't exist
+- name: Check if ZFS dataset exists
+  ansible.builtin.command: zfs list {{ lxd_zfs_pool }}
+  register: zfs_dataset_check
+  changed_when: false
+  failed_when: false
+
+- name: Create ZFS dataset for LXD
+  ansible.builtin.command: zfs create {{ lxd_zfs_pool }}
+  when: zfs_dataset_check.rc != 0
+
+# Create the container
+- name: Check if container exists
+  ansible.builtin.command: lxc info {{ container_name }}
+  register: container_check
+  changed_when: false
+  failed_when: false
+
+- name: Create LXD container
+  ansible.builtin.command: >
+    lxc launch ubuntu:24.04 {{ container_name }}
+    --storage {{ lxd_storage_pool }}
+    --config limits.cpu={{ container_cpu }}
+    --config limits.memory={{ container_memory }}
+    --config security.nesting=false
+    --config security.privileged=false
+  when: container_check.rc != 0
+
+- name: Set root disk size
+  ansible.builtin.command: >
+    lxc config device set {{ container_name }} root size={{ container_disk }}
+  when: container_check.rc != 0
+
+# Configure network with macvlan on VLAN 16
+- name: Remove default eth0 device
+  ansible.builtin.command: lxc config device remove {{ container_name }} eth0
+  failed_when: false
+  changed_when: false
+
+- name: Add macvlan network device on VLAN 16
+  ansible.builtin.command: >
+    lxc config device add {{ container_name }} eth0 nic
+    nictype=macvlan
+    parent={{ container_parent_interface }}
+    name=eth0
+  register: add_device
+  changed_when: "'Device eth0 added' in add_device.stdout"
+  failed_when: false
+
+- name: Restart container to apply network changes
+  community.general.lxd_container:
+    name: "{{ container_name }}"
+    state: restarted
+
+- name: Wait for container to be running
+  ansible.builtin.command: lxc info {{ container_name }}
+  register: container_status
+  until: "'Status: RUNNING' in container_status.stdout"
+  retries: 10
+  delay: 3
+  changed_when: false
+
+# Configure static IP inside container
+- name: Create netplan config in container
+  ansible.builtin.shell: |
+    cat << 'EOF' | lxc exec {{ container_name }} -- tee /etc/netplan/10-lxc.yaml
+    {{ lookup('template', 'netplan.yaml.j2') }}
+    EOF
+  changed_when: true
+
+- name: Remove default cloud-init netplan
+  ansible.builtin.command: lxc exec {{ container_name }} -- rm -f /etc/netplan/50-cloud-init.yaml
+  changed_when: false
+  failed_when: false
+
+- name: Apply netplan in container
+  ansible.builtin.command: lxc exec {{ container_name }} -- netplan apply
+  changed_when: false
+
+- name: Wait for network connectivity
+  ansible.builtin.command: lxc exec {{ container_name }} -- ping -c 1 {{ container_gateway }}
+  register: ping_result
+  until: ping_result.rc == 0
+  retries: 10
+  delay: 3
+  changed_when: false
+
+# Install Node.js and applications
+- name: Update apt cache in container
+  ansible.builtin.command: lxc exec {{ container_name }} -- apt-get update
+  changed_when: false
+
+- name: Install prerequisites in container
+  ansible.builtin.command: lxc exec {{ container_name }} -- apt-get install -y curl git ca-certificates gnupg
+  changed_when: false
+
+- name: Install Node.js {{ nodejs_version }} in container
+  ansible.builtin.shell: |
+    lxc exec {{ container_name }} -- bash -c 'curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | bash -'
+    lxc exec {{ container_name }} -- apt-get install -y nodejs
+  changed_when: true
+
+- name: Install Claude Code CLI
+  ansible.builtin.command: lxc exec {{ container_name }} -- npm install -g @anthropic-ai/claude-code
+  changed_when: true
+
+- name: Install Claude Code UI
+  ansible.builtin.command: lxc exec {{ container_name }} -- npm install -g @siteboon/claude-code-ui
+  changed_when: true
+
+- name: Install PM2
+  ansible.builtin.command: lxc exec {{ container_name }} -- npm install -g pm2
+  changed_when: true
+
+- name: Start Claude Code UI with PM2
+  ansible.builtin.command: lxc exec {{ container_name }} -- pm2 start claude-code-ui --name claude-ui
+  changed_when: true
+
+- name: Save PM2 process list
+  ansible.builtin.command: lxc exec {{ container_name }} -- pm2 save
+  changed_when: false
+
+- name: Setup PM2 startup script
+  ansible.builtin.command: lxc exec {{ container_name }} -- bash -c 'pm2 startup systemd -u root --hp /root | tail -1 | bash'
+  changed_when: true
+
+- name: Display post-install instructions
+  ansible.builtin.debug:
+    msg: |
+
+      ============================================
+      Claude Code UI deployed successfully!
+      ============================================
+
+      Container IP: {{ container_ip }}
+      UI URL: http://{{ container_ip }}:{{ claude_code_ui_port }}
+
+      NEXT STEPS - Authenticate Claude Code CLI:
+
+        lxc exec {{ container_name }} -- claude
+
+      This will open an interactive auth flow. Once complete,
+      Claude Code UI will be fully functional.
+
+      Useful commands:
+        lxc exec {{ container_name }} -- bash     # Shell into container
+        lxc exec {{ container_name }} -- pm2 logs # View UI logs
+        lxc stop {{ container_name }}             # Stop container
+        lxc start {{ container_name }}            # Start container
+
+      ============================================

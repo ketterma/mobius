@@ -1,0 +1,24 @@
+---
+# LXD container settings
+container_name: claude-code-ui
+container_image: ubuntu/24.04
+
+# Resource limits
+container_cpu: 2
+container_memory: 4GB
+container_disk: 20GB
+
+# Network configuration (VLAN 8 - LoadBalancer)
+container_ip: 192.168.8.60
+container_netmask: 24
+container_gateway: 192.168.8.1
+container_dns: 192.168.4.53
+container_parent_interface: enp197s0.8
+
+# LXD storage
+lxd_storage_pool: vms-lxd
+lxd_zfs_pool: vms/lxd
+
+# Application settings
+nodejs_version: "20"
+claude_code_ui_port: 3001
