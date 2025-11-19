@@ -6,77 +6,15 @@ views:
     type: sections
     sections:
       # Alerts & Tasks Section
-      - type: grid
+      - title: Alerts & Tasks
         cards:
-          # Active Alerts Header
-          - type: custom:mushroom-template-card
-            primary: "Alerts & Tasks"
-            secondary: >
-              {{ states('sensor.active_alerts_count') }} alerts,
-              {{ states('sensor.pending_chores_count') }} chores
-            icon: mdi:alert-circle
-            icon_color: >
-              {% if states('sensor.active_alerts_count') | int > 0 %}
-                red
-              {% elif states('sensor.pending_chores_count') | int > 0 %}
-                orange
-              {% else %}
-                green
-              {% endif %}
-            card_mod:
-              style: |
-                ha-card {
-                  --chip-background: none;
-                }
-
-          # Water Fountain Alert
-          - type: conditional
-            conditions:
-              - entity: binary_sensor.water_fountain_needs_attention
-                state: "on"
-            card:
-              type: custom:mushroom-template-card
-              primary: "Water Fountain"
-              secondary: >
-                {% if is_state('binary_sensor.eversweet_3_pro_water_lack_warning', 'on') %}
-                  Needs refilling
-                {% elif is_state('binary_sensor.eversweet_3_pro_replace_filter', 'on') %}
-                  Replace filter
-                {% endif %}
-              icon: mdi:cup-water
-              icon_color: orange
-              tap_action:
-                action: none
-
-          # Cat Feeder Alert
-          - type: conditional
-            conditions:
-              - entity: binary_sensor.cat_feeder_needs_attention
-                state: "on"
-            card:
-              type: custom:mushroom-template-card
-              primary: "Cat Feeder"
-              secondary: >
-                {% if is_state('binary_sensor.shadow_feeder_food_level_hopper_1', 'off') %}
-                  Hopper 1 low
-                {% elif is_state('binary_sensor.shadow_feeder_food_level_hopper_2', 'off') %}
-                  Hopper 2 low
-                {% elif states('sensor.shadow_feeder_desiccant_left_days') | int(0) < 3 %}
-                  Replace desiccant
-                {% endif %}
-              icon: mdi:cat
-              icon_color: orange
-              tap_action:
-                action: none
-
           # Household Chores Todo List
           - type: todo-list
             entity: todo.household_chores
             title: Household Chores
 
       # Pet Status Section
-      - type: grid
-        title: Pet Care
+      - title: Pet Care
         cards:
           - type: custom:mushroom-entity-card
             entity: sensor.eversweet_3_pro_purified_water
@@ -91,18 +29,9 @@ views:
           - type: custom:mushroom-entity-card
             entity: sensor.shadow_feeder_desiccant_left_days
             name: "Desiccant Days Left"
-            icon_color: >
-              {% if states('sensor.shadow_feeder_desiccant_left_days') | int(0) < 3 %}
-                red
-              {% elif states('sensor.shadow_feeder_desiccant_left_days') | int(0) < 7 %}
-                orange
-              {% else %}
-                green
-              {% endif %}
 
       # Quick Controls Section
-      - type: grid
-        title: Quick Controls
+      - title: Quick Controls
         cards:
           - type: custom:mushroom-light-card
             entity: light.main_bedroom_lights
@@ -130,7 +59,7 @@ views:
     icon: mdi:clipboard-check
     type: sections
     sections:
-      - type: grid
+      - title: Todo Lists
         cards:
           - type: todo-list
             entity: todo.household_chores
