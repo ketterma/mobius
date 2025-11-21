@@ -1,0 +1,64 @@
+# Traefik Helm values for Lab cluster
+
+# LoadBalancer service with MetalLB IP on VLAN 8
+service:
+  type: LoadBalancer
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.8.50
+
+# Enable IngressRoute CRD
+ingressRoute:
+  dashboard:
+    enabled: false
+
+# Allow ExternalName services
+providers:
+  kubernetesCRD:
+    allowExternalNameServices: true
+
+# Security context
+podSecurityContext:
+  fsGroup: 65532
+  fsGroupChangePolicy: "OnRootMismatch"
+
+# Persistent storage for Let's Encrypt certificates
+persistence:
+  enabled: true
+  storageClass: openebs-zfs-homelab
+  size: 1Gi
+  path: /data
+
+# Let's Encrypt DNS-01 challenge (behind NAT)
+additionalArguments:
+  - "--certificatesresolvers.letsencrypt.acme.email=admin@jaxon.cloud"
+  - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
+  - "--experimental.plugins.traefikoidc.moduleName=github.com/lukaszraczylo/traefikoidc"
+  - "--experimental.plugins.traefikoidc.version=v0.7.10"
+
+# Enable experimental plugins
+experimental:
+  plugins:
+    traefikoidc:
+      moduleName: github.com/lukaszraczylo/traefikoidc
+      version: v0.7.10
+
+# Cloudflare API token for DNS challenge
+env:
+  - name: CF_DNS_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: CF_DNS_API_TOKEN
+  - name: ADGUARD_OIDC_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: adguard-oidc-config
+        key: client-secret
+  - name: ADGUARD_OIDC_SESSION_KEY
+    valueFrom:
+      secretKeyRef:
+        name: adguard-oidc-config
+        key: session-key

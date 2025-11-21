@@ -1,0 +1,34 @@
+# Uptime Kuma Helm values for PHX cluster
+
+image:
+  repository: louislam/uptime-kuma
+  tag: 2
+  pullPolicy: IfNotPresent
+
+# Persistent storage for Uptime Kuma data
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: local-path
+  accessMode: ReadWriteOnce
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 3001
+
+# Resources
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# Use host DNS instead of cluster DNS to avoid resolution issues
+dnsPolicy: Default
+
+# Ingress disabled - we'll use Traefik IngressRoute instead
+ingress:
+  enabled: false

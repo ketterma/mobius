@@ -8,18 +8,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-lab:
-    name: Deploy to Lab Cluster
+  setup:
+    name: Setup Tools
     runs-on: [self-hosted, phx]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Cache tools
         uses: actions/cache@v4
         with:
           path: ~/.local/bin
-          key: tools-${{ runner.os }}-v1
+          key: tools-${{ runner.os }}-v2
 
       - name: Install tools
         run: |
@@ -33,6 +30,13 @@ jobs:
             mv kubectl ~/.local/bin/
           fi
 
+          # Install helm if not cached
+          if [ ! -f ~/.local/bin/helm ]; then
+            curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz | tar xz
+            mv linux-amd64/helm ~/.local/bin/
+            rm -rf linux-amd64
+          fi
+
           # Install sops if not cached
           if [ ! -f ~/.local/bin/sops ]; then
             curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
@@ -40,85 +44,126 @@ jobs:
             mv sops-v3.9.0.linux.amd64 ~/.local/bin/sops
           fi
 
-      - name: Deploy to Lab
+          # Add all Helm repos upfront
+          helm repo add metallb https://metallb.github.io/metallb
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add uptime-kuma https://dirsigler.github.io/uptime-kuma-helm
+          helm repo update
+
+  deploy:
+    name: Deploy to ${{ matrix.cluster }}
+    runs-on: [self-hosted, phx]
+    needs: setup
+    strategy:
+      matrix:
+        cluster: [lab, phx]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy Lab Infrastructure
+        if: matrix.cluster == 'lab'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           export KUBECONFIG=/home/runner/.kube/config-lab
-          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
 
-          # Decrypt all SOPS files in-place
-          find k8s/clusters/lab -name "*.sops.yaml" -exec sops -d -i {} \;
+          # Deploy MetalLB
+          helm upgrade --install metallb metallb/metallb \
+            --namespace metallb-system \
+            --create-namespace \
+            --values k8s/clusters/lab/infrastructure/metallb/values.yaml \
+            --wait
 
-          kubectl apply -k k8s/clusters/lab/infrastructure-config
-          kubectl apply -k k8s/clusters/lab/apps
+          # Deploy Traefik
+          helm upgrade --install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            --values k8s/clusters/lab/infrastructure/traefik/values.yaml \
+            --wait
 
-  deploy-phx:
-    name: Deploy to PHX Cluster
-    runs-on: [self-hosted, phx]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+          # Deploy External-DNS
+          helm upgrade --install external-dns external-dns/external-dns \
+            --namespace external-dns \
+            --create-namespace \
+            --values k8s/clusters/lab/infrastructure/external-dns/values.yaml \
+            --wait
 
-      - name: Cache tools
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/bin
-          key: tools-${{ runner.os }}-v1
-
-      - name: Install tools
-        run: |
-          mkdir -p ~/.local/bin
-          export PATH="$HOME/.local/bin:$PATH"
-
-          # Install kubectl if not cached
-          if [ ! -f ~/.local/bin/kubectl ]; then
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-            chmod +x kubectl
-            mv kubectl ~/.local/bin/
-          fi
-
-          # Install sops if not cached
-          if [ ! -f ~/.local/bin/sops ]; then
-            curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
-            chmod +x sops-v3.9.0.linux.amd64
-            mv sops-v3.9.0.linux.amd64 ~/.local/bin/sops
-          fi
-
-      - name: Deploy to PHX
+      - name: Deploy PHX Infrastructure
+        if: matrix.cluster == 'phx'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           export KUBECONFIG=/home/runner/.kube/config-phx
+
+          # Deploy Traefik
+          helm upgrade --install traefik traefik/traefik \
+            --namespace traefik \
+            --create-namespace \
+            --values k8s/clusters/phx/infrastructure/traefik/values.yaml \
+            --wait
+
+          # Deploy External-DNS
+          helm upgrade --install external-dns external-dns/external-dns \
+            --namespace external-dns \
+            --create-namespace \
+            --values k8s/clusters/phx/infrastructure/external-dns/values.yaml \
+            --wait
+
+      - name: Deploy PHX Apps (Helm)
+        if: matrix.cluster == 'phx'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-phx
+
+          # Deploy Uptime Kuma
+          helm upgrade --install uptime-kuma uptime-kuma/uptime-kuma \
+            --namespace uptime-kuma \
+            --create-namespace \
+            --values k8s/clusters/phx/apps/uptime-kuma/values.yaml \
+            --wait
+
+      - name: Deploy Config
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
           export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
 
-          # Decrypt all SOPS files in-place
-          find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i {} \;
+          if [ "${{ matrix.cluster }}" = "lab" ]; then
+            export KUBECONFIG=/home/runner/.kube/config-lab
 
-          kubectl apply -k k8s/clusters/phx/infrastructure
-          kubectl apply -k k8s/clusters/phx/infrastructure-config
+            # Decrypt all SOPS files in-place
+            find k8s/clusters/lab -name "*.sops.yaml" -exec sops -d -i {} \;
+
+            kubectl apply -k k8s/clusters/lab/infrastructure-config
+            kubectl apply -k k8s/clusters/lab/apps
+          else
+            export KUBECONFIG=/home/runner/.kube/config-phx
+
+            # Decrypt all SOPS files in-place
+            find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i {} \;
+
+            kubectl apply -k k8s/clusters/phx/infrastructure-config
+            kubectl apply -k k8s/clusters/phx/apps
+          fi
 
   notify:
     name: Send Notification
     runs-on: [self-hosted, phx]
-    needs: [deploy-lab, deploy-phx]
+    needs: deploy
     if: always()
     steps:
       - name: Notify via Pushover
         run: |
-          LAB_RESULT="${{ needs.deploy-lab.result }}"
-          PHX_RESULT="${{ needs.deploy-phx.result }}"
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          if [ "$LAB_RESULT" = "success" ] && [ "$PHX_RESULT" = "success" ]; then
-            TITLE="✅ Deploy Succeeded"
-            MESSAGE="Lab ✓ PHX ✓"
+          if [ "$DEPLOY_RESULT" = "success" ]; then
+            TITLE="Deploy Succeeded"
+            MESSAGE="Lab and PHX deployed successfully"
             PRIORITY=0
           else
-            TITLE="❌ Deploy Failed"
-            # Build detailed failure message
-            MSG=""
-            [ "$LAB_RESULT" != "success" ] && MSG="Lab: $LAB_RESULT"
-            [ "$PHX_RESULT" != "success" ] && MSG="$MSG${MSG:+, }PHX: $PHX_RESULT"
-            MESSAGE="$MSG"
+            TITLE="Deploy Failed"
+            MESSAGE="Deployment failed: $DEPLOY_RESULT"
             PRIORITY=1
           fi
 

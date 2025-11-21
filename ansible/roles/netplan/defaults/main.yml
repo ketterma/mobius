@@ -1,0 +1,23 @@
+---
+# Network configuration defaults for N5
+
+# Primary interface (10G NIC)
+netplan_primary_interface: enp197s0
+netplan_primary_ip: 192.168.4.5/24
+netplan_gateway: 192.168.4.1
+netplan_dns_servers:
+  - 192.168.4.53  # AdGuard Home
+  - 1.1.1.1       # Cloudflare fallback
+
+# Secondary interface (5G NIC for IoT bridge)
+netplan_secondary_interface: eno1
+
+# VLAN 8 - Infrastructure VIPs (MetalLB LoadBalancers)
+netplan_vlan8_ip: 192.168.8.254/24
+
+# VLAN 16 - Sandbox/Untrusted
+netplan_vlan16_ip: 192.168.16.254/20
+
+# VLAN 64 - IoT (bridge for Home Assistant VM)
+# Note: Must not conflict with UDM gateway at 192.168.64.1
+netplan_bridge64_ip: 192.168.64.3/20

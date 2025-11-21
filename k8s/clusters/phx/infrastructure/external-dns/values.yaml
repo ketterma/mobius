@@ -1,0 +1,33 @@
+# External-DNS Helm values for PHX cluster (Cloudflare)
+
+# Watch Traefik IngressRoute resources
+sources:
+  - traefik-proxy
+
+policy: sync
+logLevel: info
+interval: 1m
+
+# Use Cloudflare provider for public DNS
+provider:
+  name: cloudflare
+
+# Cluster identification
+txtOwnerId: phx-cluster
+txtPrefix: external-dns-
+
+# Only manage jaxon.cloud domain
+domainFilters:
+  - jaxon.cloud
+
+# Disable legacy Traefik API group (use traefik.io, not traefik.containo.us)
+extraArgs:
+  - --traefik-disable-legacy
+
+# Cloudflare API token
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: CF_API_TOKEN

@@ -1,0 +1,68 @@
+# Netplan configuration for N5 VLAN interfaces
+# Managed by Ansible - do not edit manually
+#
+# IMPORTANT: VLAN interfaces need IP addresses for proper routing
+# - VLAN 1 (untagged on {{ netplan_primary_interface }}): Required for host connectivity and VLAN 1 LoadBalancers
+# - VLAN 8 ({{ netplan_primary_interface }}.8): Required for routing to LoadBalancers in services pool
+# - VLAN 16 ({{ netplan_primary_interface }}.16): Required for routing to future sandbox workloads
+# - Bridge64: Required for routing to IoT VLAN (Home Assistant VM)
+#
+# Without IP addresses, MetalLB LoadBalancer IPs won't be accessible from other networks
+# because the kernel can't route packets arriving on the VLAN interface.
+
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    # 10G NIC - primary interface with untagged VLAN 1 (Infra)
+    {{ netplan_primary_interface }}:
+      dhcp4: false
+      dhcp6: false
+      addresses:
+        - {{ netplan_primary_ip }}
+      routes:
+        - to: default
+          via: {{ netplan_gateway }}
+      nameservers:
+        addresses:
+{% for dns in netplan_dns_servers %}
+          - {{ dns }}
+{% endfor %}
+
+    # 5G NIC - for IoT bridge
+    {{ netplan_secondary_interface }}:
+      dhcp4: false
+      dhcp6: false
+
+  vlans:
+    # VLAN 8 - Infrastructure VIPs (MetalLB LoadBalancers)
+    {{ netplan_primary_interface }}.8:
+      id: 8
+      link: {{ netplan_primary_interface }}
+      addresses:
+        - {{ netplan_vlan8_ip }}
+
+    # VLAN 16 - Sandbox/Untrusted (future use)
+    {{ netplan_primary_interface }}.16:
+      id: 16
+      link: {{ netplan_primary_interface }}
+      addresses:
+        - {{ netplan_vlan16_ip }}
+
+    # VLAN 64 - IoT (for bridge)
+    {{ netplan_secondary_interface }}.64:
+      id: 64
+      link: {{ netplan_secondary_interface }}
+      # No IP - will be added to bridge64
+
+  bridges:
+    # Bridge for IoT VLAN (Home Assistant VM)
+    bridge64:
+      interfaces:
+        - {{ netplan_secondary_interface }}.64
+      addresses:
+        - {{ netplan_bridge64_ip }}
+      parameters:
+        stp: false
+        forward-delay: 0

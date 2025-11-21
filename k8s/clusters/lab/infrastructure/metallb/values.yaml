@@ -1,0 +1,3 @@
+# MetalLB Helm values for Lab cluster
+speaker:
+  tolerateMaster: true

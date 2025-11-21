@@ -74,7 +74,6 @@ ssh jax@192.168.4.5 "sudo virsh qemu-agent-command HomeAssistant '{\"execute\":\
 
 ### Configuration Files
 - **`bootstrap/`** - Infrastructure bootstrap configs
-  - `n5-netplan.yaml` - N5 network configuration (netplan)
   - `homelab-k0sctl.yaml` - Homelab k0s cluster configuration
   - `phx-k0sctl.yaml` - PHX k0s cluster configuration
   - `metallb-config.yaml` - MetalLB LoadBalancer pools
@@ -82,6 +81,7 @@ ssh jax@192.168.4.5 "sudo virsh qemu-agent-command HomeAssistant '{\"execute\":\
   - `homeassistant-vm.xml` - Home Assistant VM libvirt definition
 - **`ansible/`** - Ansible playbooks and roles for bare-metal management
   - `inventory/hosts.yml` - Host inventory (N5, M1-ubuntu, PHX)
+  - `roles/netplan/` - N5 network configuration (VLANs, bridges)
   - `roles/sanoid/` - ZFS snapshot management with Sanoid/Syncoid
 - **`homeassistant/`** - Git worktree for `homeassistant` branch (HA config at root)
   - Separate orphan branch with independent history

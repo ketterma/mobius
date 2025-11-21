@@ -1,0 +1,72 @@
+# Traefik Helm values for PHX cluster
+
+# LoadBalancer service with MetalLB
+service:
+  type: LoadBalancer
+  spec:
+    externalTrafficPolicy: Local  # Preserve client source IPs
+
+# Enable IngressRoute CRD
+ingressRoute:
+  dashboard:
+    enabled: false
+
+# Allow ExternalName services
+providers:
+  kubernetesCRD:
+    allowExternalNameServices: true
+
+# Security context
+podSecurityContext:
+  fsGroup: 65532
+  fsGroupChangePolicy: "OnRootMismatch"
+
+# Standard deployment (no hostNetwork)
+deployment:
+  kind: Deployment
+  replicas: 1
+
+# Standard container ports (MetalLB handles external mapping)
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+    http3:
+      enabled: true
+    tls:
+      enabled: true
+
+# Persistent storage for Let's Encrypt certificates
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 1Gi
+  path: /data
+
+# Let's Encrypt DNS-01 challenge with Cloudflare
+additionalArguments:
+  - "--certificatesresolvers.letsencrypt.acme.email=admin@jaxon.cloud"
+  - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+  - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+
+# Cloudflare API token for DNS-01 challenge
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: CF_API_TOKEN
+  - name: CLOUDFLARE_DNS_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token
+        key: CF_API_TOKEN

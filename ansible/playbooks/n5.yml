@@ -4,7 +4,7 @@
   become: true
 
   roles:
+    - role: netplan
+      tags: [netplan, network]
     - role: sanoid
       tags: [sanoid, backup]
-    - role: claude_code_ui
-      tags: [claude-code-ui, lxd]

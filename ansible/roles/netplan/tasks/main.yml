@@ -1,0 +1,19 @@
+---
+- name: Deploy netplan configuration
+  ansible.builtin.template:
+    src: 01-netcfg.yaml.j2
+    dest: /etc/netplan/01-netcfg.yaml
+    owner: root
+    group: root
+    mode: '0600'
+    backup: yes
+  notify: Apply netplan
+
+- name: Remove old netplan files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/netplan/00-installer-config.yaml
+    - /etc/netplan/50-cloud-init.yaml
+  notify: Apply netplan
