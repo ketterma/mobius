@@ -69,15 +69,15 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           export KUBECONFIG=/home/runner/.kube/config-lab
 
-          # Deploy MetalLB
-          helm upgrade --install metallb metallb/metallb \
+          # Deploy MetalLB (using Flux's release name)
+          helm upgrade --install metallb-system-metallb metallb/metallb \
             --namespace metallb-system \
             --create-namespace \
             --values k8s/clusters/lab/infrastructure/metallb/values.yaml \
             --wait
 
-          # Deploy Traefik
-          helm upgrade --install traefik traefik/traefik \
+          # Deploy Traefik (using Flux's release name)
+          helm upgrade --install traefik-traefik traefik/traefik \
             --namespace traefik \
             --create-namespace \
             --values k8s/clusters/lab/infrastructure/traefik/values.yaml \
@@ -96,8 +96,8 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           export KUBECONFIG=/home/runner/.kube/config-phx
 
-          # Deploy Traefik
-          helm upgrade --install traefik traefik/traefik \
+          # Deploy Traefik (using Flux's release name)
+          helm upgrade --install traefik-traefik traefik/traefik \
             --namespace traefik \
             --create-namespace \
             --values k8s/clusters/phx/infrastructure/traefik/values.yaml \
