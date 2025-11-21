@@ -20,10 +20,6 @@ txtPrefix: external-dns-
 domainFilters:
   - jaxon.cloud
 
-# Disable legacy Traefik API group (use traefik.io, not traefik.containo.us)
-extraArgs:
-  - --traefik-disable-legacy
-
 # Cloudflare API token
 env:
   - name: CF_API_TOKEN
