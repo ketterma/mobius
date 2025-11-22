@@ -67,6 +67,9 @@ jobs:
     name: "Lab: MetalLB"
     runs-on: [self-hosted, phx]
     needs: setup
+    environment:
+      name: lab
+      url: https://192.168.8.50
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -82,6 +85,9 @@ jobs:
     name: "Lab: Traefik"
     runs-on: [self-hosted, phx]
     needs: setup
+    environment:
+      name: lab
+      url: https://192.168.8.50
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -97,6 +103,9 @@ jobs:
     name: "Lab: External-DNS"
     runs-on: [self-hosted, phx]
     needs: setup
+    environment:
+      name: lab
+      url: https://192.168.8.50
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -112,6 +121,9 @@ jobs:
     name: "Lab: Infrastructure Config"
     runs-on: [self-hosted, phx]
     needs: [setup, lab-metallb, lab-traefik]
+    environment:
+      name: lab
+      url: https://192.168.8.50
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -125,6 +137,9 @@ jobs:
     name: "Lab: Apps"
     runs-on: [self-hosted, phx]
     needs: [setup, lab-traefik]
+    environment:
+      name: lab
+      url: https://192.168.8.50
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -139,6 +154,9 @@ jobs:
     name: "PHX: Traefik"
     runs-on: [self-hosted, phx]
     needs: setup
+    environment:
+      name: phx
+      url: https://uptime.jaxon.cloud
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -154,6 +172,9 @@ jobs:
     name: "PHX: External-DNS"
     runs-on: [self-hosted, phx]
     needs: setup
+    environment:
+      name: phx
+      url: https://uptime.jaxon.cloud
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -169,6 +190,9 @@ jobs:
     name: "PHX: Uptime Kuma"
     runs-on: [self-hosted, phx]
     needs: setup
+    environment:
+      name: phx
+      url: https://uptime.jaxon.cloud
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -184,6 +208,9 @@ jobs:
     name: "PHX: Infrastructure Config"
     runs-on: [self-hosted, phx]
     needs: [setup, phx-traefik]
+    environment:
+      name: phx
+      url: https://uptime.jaxon.cloud
     steps:
       - uses: actions/checkout@v4
       - run: |
@@ -197,6 +224,9 @@ jobs:
     name: "PHX: Apps"
     runs-on: [self-hosted, phx]
     needs: [setup, phx-traefik]
+    environment:
+      name: phx
+      url: https://uptime.jaxon.cloud
     steps:
       - uses: actions/checkout@v4
       - run: |
