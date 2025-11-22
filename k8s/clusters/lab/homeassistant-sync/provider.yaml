@@ -1,8 +1,0 @@
-apiVersion: notification.toolkit.fluxcd.io/v1beta3
-kind: Provider
-metadata:
-  name: homeassistant-webhook
-  namespace: flux-system
-spec:
-  type: generic
-  address: http://192.168.64.2:8123/api/webhook/git-pull-deploy
