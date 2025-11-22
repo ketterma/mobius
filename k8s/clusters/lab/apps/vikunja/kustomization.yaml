@@ -3,8 +3,8 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - pvc.yaml
-  - secret.sops.yaml
-  - oidc-config.sops.yaml
+  - secret.yaml
+  - oidc-config.yaml
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml

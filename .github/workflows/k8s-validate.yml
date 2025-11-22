@@ -180,6 +180,29 @@ jobs:
 
           echo "::endgroup::"
 
+      - name: Render kustomize outputs for deployment detection
+        run: |
+          echo "::group::Rendering Kustomize Outputs"
+
+          mkdir -p rendered-manifests
+
+          # Render Lab cluster
+          kustomize build k8s/clusters/lab > rendered-manifests/lab-cluster.yaml
+          echo "✅ Rendered Lab cluster manifests"
+
+          # Render PHX cluster
+          kustomize build k8s/clusters/phx > rendered-manifests/phx-cluster.yaml
+          echo "✅ Rendered PHX cluster manifests"
+
+          echo "::endgroup::"
+
+      - name: Upload rendered manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-manifests
+          path: rendered-manifests/
+          retention-days: 7
+
       - name: Summary
         if: success()
         run: |

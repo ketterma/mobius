@@ -15,13 +15,60 @@ jobs:
     name: Check Validation Status
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      lab_changed: ${{ steps.changes.outputs.lab }}
+      phx_changed: ${{ steps.changes.outputs.phx }}
     steps:
-      - run: echo "Validation passed, proceeding with deployment"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect changed clusters
+        id: changes
+        run: |
+          # Get the commit that triggered the validation workflow
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+
+          # Get all changed files
+          CHANGED_FILES=$(git diff --name-only $COMMIT_SHA~1 $COMMIT_SHA)
+
+          # Shared paths that affect both clusters
+          SHARED_PATHS="^k8s/base/|^k8s/infrastructure/|^k8s/.*values\.yaml$"
+
+          LAB_CHANGED=false
+          PHX_CHANGED=false
+
+          # Check for shared path changes (affects both clusters)
+          if echo "$CHANGED_FILES" | grep -qE "$SHARED_PATHS"; then
+            LAB_CHANGED=true
+            PHX_CHANGED=true
+            echo "🔄 Shared k8s files changed - deploying to both clusters"
+          fi
+
+          # Check for lab-specific changes
+          if echo "$CHANGED_FILES" | grep -q '^k8s/clusters/lab/'; then
+            LAB_CHANGED=true
+            echo "✅ Lab cluster files changed"
+          fi
+
+          # Check for phx-specific changes
+          if echo "$CHANGED_FILES" | grep -q '^k8s/clusters/phx/'; then
+            PHX_CHANGED=true
+            echo "✅ PHX cluster files changed"
+          fi
+
+          # Set outputs
+          echo "lab=$LAB_CHANGED" >> $GITHUB_OUTPUT
+          echo "phx=$PHX_CHANGED" >> $GITHUB_OUTPUT
+
+          if [ "$LAB_CHANGED" = false ] && [ "$PHX_CHANGED" = false ]; then
+            echo "⏭️  No cluster-specific changes detected"
+          fi
 
   setup:
     name: Setup Tools
     runs-on: [self-hosted, phx]
     needs: check-validation
+    if: ${{ needs.check-validation.outputs.lab_changed == 'true' || needs.check-validation.outputs.phx_changed == 'true' }}
     steps:
       - name: Cache tools
         uses: actions/cache@v4
@@ -66,7 +113,8 @@ jobs:
   lab-metallb:
     name: "Lab: MetalLB"
     runs-on: [self-hosted, phx]
-    needs: setup
+    needs: [check-validation, setup]
+    if: ${{ needs.check-validation.outputs.lab_changed == 'true' }}
     environment:
       name: lab
       url: https://192.168.8.50
@@ -84,7 +132,8 @@ jobs:
   lab-traefik:
     name: "Lab: Traefik"
     runs-on: [self-hosted, phx]
-    needs: setup
+    needs: [check-validation, setup]
+    if: ${{ needs.check-validation.outputs.lab_changed == 'true' }}
     environment:
       name: lab
       url: https://192.168.8.50
@@ -102,7 +151,8 @@ jobs:
   lab-external-dns:
     name: "Lab: External-DNS"
     runs-on: [self-hosted, phx]
-    needs: setup
+    needs: [check-validation, setup]
+    if: ${{ needs.check-validation.outputs.lab_changed == 'true' }}
     environment:
       name: lab
       url: https://192.168.8.50
@@ -120,7 +170,8 @@ jobs:
   lab-infrastructure-config:
     name: "Lab: Infrastructure Config"
     runs-on: [self-hosted, phx]
-    needs: [setup, lab-metallb, lab-traefik]
+    needs: [check-validation, setup, lab-metallb, lab-traefik]
+    if: ${{ needs.check-validation.outputs.lab_changed == 'true' }}
     environment:
       name: lab
       url: https://192.168.8.50
@@ -136,7 +187,8 @@ jobs:
   lab-apps:
     name: "Lab: Apps"
     runs-on: [self-hosted, phx]
-    needs: [setup, lab-traefik]
+    needs: [check-validation, setup, lab-traefik]
+    if: ${{ needs.check-validation.outputs.lab_changed == 'true' }}
     environment:
       name: lab
       url: https://192.168.8.50

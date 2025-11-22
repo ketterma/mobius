@@ -133,15 +133,6 @@ jobs:
             echo "   New: ${{ steps.new.outputs.manifest_hash }}"
           fi
 
-      - name: Decrypt SOPS secrets
-        if: steps.check.outputs.needs_deploy == 'true'
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
-
-          # Find and decrypt any SOPS-encrypted files in the checked out repo
-          find k8s/clusters/lab -name "*.sops.yaml" -exec sops -d -i {} \; || true
-
       - name: Deploy to cluster
         if: steps.check.outputs.needs_deploy == 'true'
         run: |
@@ -301,15 +292,6 @@ jobs:
             echo "   Old: ${{ steps.deployed.outputs.deployed_hash }}"
             echo "   New: ${{ steps.new.outputs.manifest_hash }}"
           fi
-
-      - name: Decrypt SOPS secrets
-        if: steps.check.outputs.needs_deploy == 'true'
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
-
-          # Find and decrypt any SOPS-encrypted files in the checked out repo
-          find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i {} \; || true
 
       - name: Deploy to cluster
         if: steps.check.outputs.needs_deploy == 'true'

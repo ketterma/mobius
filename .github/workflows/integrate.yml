@@ -132,6 +132,31 @@ jobs:
 
           echo "✅ Rendered Helm charts"
 
+      - name: Install SOPS
+        run: |
+          # Install sops for secret decryption
+          SOPS_VERSION=3.9.0
+          wget -q https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64
+          chmod +x sops-v${SOPS_VERSION}.linux.amd64
+          sudo mv sops-v${SOPS_VERSION}.linux.amd64 /usr/local/bin/sops
+
+      - name: Decrypt SOPS secrets
+        run: |
+          # Create age key file from secret
+          mkdir -p ~/.config/sops/age
+          echo "$SOPS_AGE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+
+          # Decrypt all SOPS-encrypted files in-place before kustomize build
+          # This ensures kustomize builds clean Kubernetes resources without SOPS metadata
+          find k8s/clusters/lab -name "*.sops.yaml" -exec sh -c '
+            echo "Decrypting: $1"
+            sops --decrypt "$1" > "${1%.sops.yaml}.yaml"
+          ' _ {} \;
+          echo "✅ Decrypted SOPS secrets"
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+
       - name: Render Kustomize resources
         run: |
           # Infrastructure config
@@ -249,6 +274,31 @@ jobs:
             > rendered/phx/03-uptime-kuma.yaml
 
           echo "✅ Rendered Helm charts"
+
+      - name: Install SOPS
+        run: |
+          # Install sops for secret decryption
+          SOPS_VERSION=3.9.0
+          wget -q https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64
+          chmod +x sops-v${SOPS_VERSION}.linux.amd64
+          sudo mv sops-v${SOPS_VERSION}.linux.amd64 /usr/local/bin/sops
+
+      - name: Decrypt SOPS secrets
+        run: |
+          # Create age key file from secret
+          mkdir -p ~/.config/sops/age
+          echo "$SOPS_AGE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+
+          # Decrypt all SOPS-encrypted files in-place before kustomize build
+          # This ensures kustomize builds clean Kubernetes resources without SOPS metadata
+          find k8s/clusters/phx -name "*.sops.yaml" -exec sh -c '
+            echo "Decrypting: $1"
+            sops --decrypt "$1" > "${1%.sops.yaml}.yaml"
+          ' _ {} \;
+          echo "✅ Decrypted SOPS secrets"
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
 
       - name: Render Kustomize resources
         run: |

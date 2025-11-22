@@ -7,5 +7,5 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml
-  - oidc-secret.sops.yaml
-  - oidc-middleware.sops.yaml
+  - oidc-secret.yaml
+  - oidc-middleware.yaml
