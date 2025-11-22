@@ -5,3 +5,4 @@ resources:
   - metallb-config.yaml
   - twingate
   - coredns-configmap.yaml
+# Trigger e2e workflow validation
