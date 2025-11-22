@@ -1,19 +1,27 @@
 name: Deploy to Kubernetes
 
 on:
-  push:
+  # Trigger after validation workflow completes successfully
+  workflow_run:
+    workflows: ["Kubernetes Manifest Validation"]
+    types:
+      - completed
     branches: [main]
-    paths:
-      - 'k8s/**'
   workflow_dispatch:
 
 jobs:
-  # Validation runs separately via k8s-validate.yml workflow
-  # This workflow depends on validation passing via branch protection rules
+  # Only run if validation succeeded
+  check-validation:
+    name: Check Validation Status
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - run: echo "Validation passed, proceeding with deployment"
 
   setup:
     name: Setup Tools
     runs-on: [self-hosted, phx]
+    needs: check-validation
     steps:
       - name: Cache tools
         uses: actions/cache@v4
