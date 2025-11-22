@@ -1,0 +1,348 @@
+name: Integrate & Build Manifests
+
+on:
+  pull_request:
+    paths:
+      - 'k8s/**/*.yaml'
+      - 'k8s/**/*.yml'
+      - '.github/workflows/integrate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'k8s/**/*.yaml'
+      - 'k8s/**/*.yml'
+
+jobs:
+  validate:
+    name: Validate Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          # Install kubeconform
+          KUBECONFORM_VERSION=0.6.4
+          wget -q https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+          # Install kustomize
+          KUSTOMIZE_VERSION=5.3.0
+          wget -q https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          tar xzf kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          sudo mv kustomize /usr/local/bin/
+
+          # Install helm
+          curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz | tar xz
+          sudo mv linux-amd64/helm /usr/local/bin/
+          rm -rf linux-amd64
+
+          # Install yamllint
+          sudo apt-get update && sudo apt-get install -y yamllint
+
+      - name: Validate YAML syntax
+        run: |
+          cat > .yamllint.yaml <<EOF
+          extends: relaxed
+          rules:
+            line-length: disable
+            indentation: disable
+            comments: disable
+            comments-indentation: disable
+            document-start: disable
+            truthy:
+              allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+              check-keys: false
+          EOF
+
+          if ! yamllint -c .yamllint.yaml k8s/; then
+            echo "::error::YAML syntax validation failed"
+            exit 1
+          fi
+          echo "✅ YAML syntax validation passed"
+
+      - name: Validate kustomize builds
+        run: |
+          for kustomization in $(find k8s -name "kustomization.yaml"); do
+            dir=$(dirname "$kustomization")
+            echo "Validating: $dir"
+            if ! kustomize build "$dir" > /dev/null; then
+              echo "::error::Failed to build kustomization in $dir"
+              exit 1
+            fi
+          done
+          echo "✅ All kustomizations build successfully"
+
+  build-lab:
+    name: Build Lab Cluster Manifests
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      manifest_hash: ${{ steps.hash.outputs.manifest_hash }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          # Install helm
+          curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz | tar xz
+          sudo mv linux-amd64/helm /usr/local/bin/
+          rm -rf linux-amd64
+
+          # Install kustomize
+          KUSTOMIZE_VERSION=5.3.0
+          wget -q https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          tar xzf kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          sudo mv kustomize /usr/local/bin/
+
+          # Install kubeconform
+          KUBECONFORM_VERSION=0.6.4
+          wget -q https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+          # Add Helm repos
+          helm repo add metallb https://metallb.github.io/metallb
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo update
+
+      - name: Render Helm charts
+        run: |
+          mkdir -p rendered/lab
+
+          # MetalLB
+          helm template metallb-system-metallb metallb/metallb \
+            --namespace metallb-system \
+            --values k8s/clusters/lab/infrastructure/metallb/values.yaml \
+            > rendered/lab/01-metallb.yaml
+
+          # Traefik
+          helm template traefik-traefik traefik/traefik \
+            --namespace traefik \
+            --values k8s/clusters/lab/infrastructure/traefik/values.yaml \
+            > rendered/lab/02-traefik.yaml
+
+          # External-DNS
+          helm template external-dns external-dns/external-dns \
+            --namespace external-dns \
+            --values k8s/clusters/lab/infrastructure/external-dns/values.yaml \
+            > rendered/lab/03-external-dns.yaml
+
+          echo "✅ Rendered Helm charts"
+
+      - name: Render Kustomize resources
+        run: |
+          # Infrastructure config
+          kustomize build k8s/clusters/lab/infrastructure-config \
+            > rendered/lab/04-infrastructure-config.yaml
+
+          # Apps
+          kustomize build k8s/clusters/lab/apps \
+            > rendered/lab/05-apps.yaml
+
+          echo "✅ Rendered Kustomize resources"
+
+      - name: Combine manifests
+        run: |
+          cat rendered/lab/*.yaml > lab-cluster.yaml
+          echo "---" >> lab-cluster.yaml
+          echo "✅ Combined all manifests into lab-cluster.yaml"
+
+      - name: Validate rendered manifests
+        run: |
+          if ! kubeconform \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -summary \
+            -ignore-missing-schemas \
+            lab-cluster.yaml; then
+            echo "::error::Schema validation failed for Lab cluster"
+            exit 1
+          fi
+          echo "✅ Schema validation passed"
+
+      - name: Calculate manifest hash
+        id: hash
+        run: |
+          # Calculate SHA256 hash of the manifest
+          HASH=$(sha256sum lab-cluster.yaml | cut -d' ' -f1 | cut -c1-16)
+          echo "manifest_hash=$HASH" >> $GITHUB_OUTPUT
+          echo "📦 Lab cluster manifest hash: $HASH"
+
+          # Create metadata file
+          cat > lab-metadata.json <<EOF
+          {
+            "manifest_hash": "$HASH",
+            "git_sha": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "built_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
+
+      - name: Upload artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-cluster-${{ steps.hash.outputs.manifest_hash }}
+          path: |
+            lab-cluster.yaml
+            lab-metadata.json
+          retention-days: 30
+
+  build-phx:
+    name: Build PHX Cluster Manifests
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      manifest_hash: ${{ steps.hash.outputs.manifest_hash }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          # Install helm
+          curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz | tar xz
+          sudo mv linux-amd64/helm /usr/local/bin/
+          rm -rf linux-amd64
+
+          # Install kustomize
+          KUSTOMIZE_VERSION=5.3.0
+          wget -q https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          tar xzf kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz
+          sudo mv kustomize /usr/local/bin/
+
+          # Install kubeconform
+          KUBECONFORM_VERSION=0.6.4
+          wget -q https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+          tar xzf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+          # Add Helm repos
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add uptime-kuma https://dirsigler.github.io/uptime-kuma-helm
+          helm repo update
+
+      - name: Render Helm charts
+        run: |
+          mkdir -p rendered/phx
+
+          # Traefik
+          helm template traefik-traefik traefik/traefik \
+            --namespace traefik \
+            --values k8s/clusters/phx/infrastructure/traefik/values.yaml \
+            > rendered/phx/01-traefik.yaml
+
+          # External-DNS
+          helm template external-dns external-dns/external-dns \
+            --namespace external-dns \
+            --values k8s/clusters/phx/infrastructure/external-dns/values.yaml \
+            > rendered/phx/02-external-dns.yaml
+
+          # Uptime Kuma
+          helm template uptime-kuma uptime-kuma/uptime-kuma \
+            --namespace uptime-kuma \
+            --values k8s/clusters/phx/apps/uptime-kuma/values.yaml \
+            > rendered/phx/03-uptime-kuma.yaml
+
+          echo "✅ Rendered Helm charts"
+
+      - name: Render Kustomize resources
+        run: |
+          # Infrastructure config
+          kustomize build k8s/clusters/phx/infrastructure-config \
+            > rendered/phx/04-infrastructure-config.yaml
+
+          # Apps
+          kustomize build k8s/clusters/phx/apps \
+            > rendered/phx/05-apps.yaml
+
+          echo "✅ Rendered Kustomize resources"
+
+      - name: Combine manifests
+        run: |
+          cat rendered/phx/*.yaml > phx-cluster.yaml
+          echo "---" >> phx-cluster.yaml
+          echo "✅ Combined all manifests into phx-cluster.yaml"
+
+      - name: Validate rendered manifests
+        run: |
+          if ! kubeconform \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -summary \
+            -ignore-missing-schemas \
+            phx-cluster.yaml; then
+            echo "::error::Schema validation failed for PHX cluster"
+            exit 1
+          fi
+          echo "✅ Schema validation passed"
+
+      - name: Calculate manifest hash
+        id: hash
+        run: |
+          # Calculate SHA256 hash of the manifest
+          HASH=$(sha256sum phx-cluster.yaml | cut -d' ' -f1 | cut -c1-16)
+          echo "manifest_hash=$HASH" >> $GITHUB_OUTPUT
+          echo "📦 PHX cluster manifest hash: $HASH"
+
+          # Create metadata file
+          cat > phx-metadata.json <<EOF
+          {
+            "manifest_hash": "$HASH",
+            "git_sha": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "built_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
+
+      - name: Upload artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: phx-cluster-${{ steps.hash.outputs.manifest_hash }}
+          path: |
+            phx-cluster.yaml
+            phx-metadata.json
+          retention-days: 30
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: [build-lab, build-phx]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 📦 Manifest Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build-lab.result }}" == "success" ]; then
+            echo "✅ **Lab Cluster**: Built successfully" >> $GITHUB_STEP_SUMMARY
+            echo "   - Hash: \`${{ needs.build-lab.outputs.manifest_hash }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Lab Cluster**: Build failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build-phx.result }}" == "success" ]; then
+            echo "✅ **PHX Cluster**: Built successfully" >> $GITHUB_STEP_SUMMARY
+            echo "   - Hash: \`${{ needs.build-phx.outputs.manifest_hash }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **PHX Cluster**: Build failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "🚀 **Artifacts uploaded** - Ready for deployment" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To deploy, run the \`Deploy to Kubernetes\` workflow with:" >> $GITHUB_STEP_SUMMARY
+            echo "- **ref**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **environment**: \`lab\`, \`phx\`, or \`all\`" >> $GITHUB_STEP_SUMMARY
+          fi

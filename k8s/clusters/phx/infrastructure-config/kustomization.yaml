@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - twingate
   - twingate-client
+  - deployment-state.yaml

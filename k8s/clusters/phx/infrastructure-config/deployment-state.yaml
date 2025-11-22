@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-state
+  namespace: kube-system
+data:
+  # This ConfigMap tracks deployment state for the PHX cluster
+  # It is automatically updated by the deploy workflow
+  # Initial values - will be overwritten on first deployment
+  phx-manifest-hash: "initial"
+  phx-deployed-at: ""
+  phx-git-sha: ""
+  phx-git-ref: ""

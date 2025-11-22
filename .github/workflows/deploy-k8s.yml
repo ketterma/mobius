@@ -1,0 +1,334 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (commit SHA, tag, or branch)'
+        required: true
+        default: 'main'
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - lab
+          - phx
+          - all
+        default: 'all'
+      artifact_run_id:
+        description: 'Optional: Workflow run ID to fetch artifacts from (for rollback)'
+        required: false
+
+jobs:
+  deploy-lab:
+    name: Deploy to Lab Cluster
+    runs-on: [self-hosted, phx]
+    if: inputs.environment == 'lab' || inputs.environment == 'all'
+    environment:
+      name: lab
+      url: https://192.168.8.50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup tools
+        run: |
+          mkdir -p ~/.local/bin
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Install kubectl if not cached
+          if [ ! -f ~/.local/bin/kubectl ]; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mv kubectl ~/.local/bin/
+          fi
+
+          # Install sops if not cached
+          if [ ! -f ~/.local/bin/sops ]; then
+            curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+            chmod +x sops-v3.9.0.linux.amd64
+            mv sops-v3.9.0.linux.amd64 ~/.local/bin/sops
+          fi
+
+      - name: Download artifact
+        if: inputs.artifact_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: lab-cluster-*
+          path: artifacts/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.artifact_run_id }}
+
+      - name: Get artifact from latest successful run
+        if: inputs.artifact_run_id == ''
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Find the latest successful integrate workflow run for this ref
+          LATEST_RUN=$(gh run list \
+            --workflow=integrate.yml \
+            --branch=${{ inputs.ref }} \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+
+          if [ -z "$LATEST_RUN" ]; then
+            echo "::error::No successful integrate workflow found for ref ${{ inputs.ref }}"
+            exit 1
+          fi
+
+          echo "Found integrate run: $LATEST_RUN"
+
+          # Download artifacts from that run
+          gh run download $LATEST_RUN --name 'lab-cluster-*' --dir artifacts/
+
+      - name: Get deployed manifest hash
+        id: deployed
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-lab
+
+          # Try to get currently deployed hash from ConfigMap
+          DEPLOYED_HASH=$(kubectl get configmap deployment-state \
+            -n kube-system \
+            -o jsonpath='{.data.lab-manifest-hash}' 2>/dev/null || echo "none")
+
+          echo "deployed_hash=$DEPLOYED_HASH" >> $GITHUB_OUTPUT
+          echo "Currently deployed hash: $DEPLOYED_HASH"
+
+      - name: Get new manifest hash
+        id: new
+        run: |
+          # Read hash from metadata file
+          NEW_HASH=$(cat artifacts/lab-metadata.json | jq -r '.manifest_hash')
+          echo "manifest_hash=$NEW_HASH" >> $GITHUB_OUTPUT
+          echo "New manifest hash: $NEW_HASH"
+
+      - name: Check if deployment needed
+        id: check
+        run: |
+          if [ "${{ steps.deployed.outputs.deployed_hash }}" == "${{ steps.new.outputs.manifest_hash }}" ]; then
+            echo "needs_deploy=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Manifest hash unchanged - skipping deployment"
+          else
+            echo "needs_deploy=true" >> $GITHUB_OUTPUT
+            echo "🚀 Manifest hash changed - deployment needed"
+            echo "   Old: ${{ steps.deployed.outputs.deployed_hash }}"
+            echo "   New: ${{ steps.new.outputs.manifest_hash }}"
+          fi
+
+      - name: Decrypt SOPS secrets
+        if: steps.check.outputs.needs_deploy == 'true'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+
+          # Find and decrypt any SOPS-encrypted files in the checked out repo
+          find k8s/clusters/lab -name "*.sops.yaml" -exec sops -d -i {} \; || true
+
+      - name: Deploy to cluster
+        if: steps.check.outputs.needs_deploy == 'true'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-lab
+
+          echo "Applying manifests to Lab cluster..."
+          kubectl apply -f artifacts/lab-cluster.yaml
+
+          # Also apply any SOPS-decrypted secrets from kustomize
+          kubectl apply -k k8s/clusters/lab/infrastructure-config || true
+          kubectl apply -k k8s/clusters/lab/apps || true
+
+      - name: Update deployment state
+        if: steps.check.outputs.needs_deploy == 'true'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-lab
+
+          # Create/update ConfigMap with deployment state
+          kubectl create configmap deployment-state \
+            -n kube-system \
+            --from-literal=lab-manifest-hash=${{ steps.new.outputs.manifest_hash }} \
+            --from-literal=lab-deployed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --from-literal=lab-git-sha=${{ github.sha }} \
+            --from-literal=lab-git-ref=${{ inputs.ref }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "✅ Updated deployment state in cluster"
+
+      - name: Record GitHub deployment
+        if: steps.check.outputs.needs_deploy == 'true'
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: lab
+          ref: ${{ inputs.ref }}
+          payload: |
+            {
+              "manifest_hash": "${{ steps.new.outputs.manifest_hash }}",
+              "git_sha": "${{ github.sha }}",
+              "deployed_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            }
+
+      - name: Deployment skipped
+        if: steps.check.outputs.needs_deploy == 'false'
+        run: echo "::notice::Deployment skipped - manifest unchanged"
+
+  deploy-phx:
+    name: Deploy to PHX Cluster
+    runs-on: [self-hosted, phx]
+    if: inputs.environment == 'phx' || inputs.environment == 'all'
+    environment:
+      name: phx
+      url: https://uptime.jaxon.cloud
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup tools
+        run: |
+          mkdir -p ~/.local/bin
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Install kubectl if not cached
+          if [ ! -f ~/.local/bin/kubectl ]; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mv kubectl ~/.local/bin/
+          fi
+
+          # Install sops if not cached
+          if [ ! -f ~/.local/bin/sops ]; then
+            curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+            chmod +x sops-v3.9.0.linux.amd64
+            mv sops-v3.9.0.linux.amd64 ~/.local/bin/sops
+          fi
+
+      - name: Download artifact
+        if: inputs.artifact_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: phx-cluster-*
+          path: artifacts/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.artifact_run_id }}
+
+      - name: Get artifact from latest successful run
+        if: inputs.artifact_run_id == ''
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+
+          # Find the latest successful integrate workflow run for this ref
+          LATEST_RUN=$(gh run list \
+            --workflow=integrate.yml \
+            --branch=${{ inputs.ref }} \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+
+          if [ -z "$LATEST_RUN" ]; then
+            echo "::error::No successful integrate workflow found for ref ${{ inputs.ref }}"
+            exit 1
+          fi
+
+          echo "Found integrate run: $LATEST_RUN"
+
+          # Download artifacts from that run
+          gh run download $LATEST_RUN --name 'phx-cluster-*' --dir artifacts/
+
+      - name: Get deployed manifest hash
+        id: deployed
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-phx
+
+          # Try to get currently deployed hash from ConfigMap
+          DEPLOYED_HASH=$(kubectl get configmap deployment-state \
+            -n kube-system \
+            -o jsonpath='{.data.phx-manifest-hash}' 2>/dev/null || echo "none")
+
+          echo "deployed_hash=$DEPLOYED_HASH" >> $GITHUB_OUTPUT
+          echo "Currently deployed hash: $DEPLOYED_HASH"
+
+      - name: Get new manifest hash
+        id: new
+        run: |
+          # Read hash from metadata file
+          NEW_HASH=$(cat artifacts/phx-metadata.json | jq -r '.manifest_hash')
+          echo "manifest_hash=$NEW_HASH" >> $GITHUB_OUTPUT
+          echo "New manifest hash: $NEW_HASH"
+
+      - name: Check if deployment needed
+        id: check
+        run: |
+          if [ "${{ steps.deployed.outputs.deployed_hash }}" == "${{ steps.new.outputs.manifest_hash }}" ]; then
+            echo "needs_deploy=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Manifest hash unchanged - skipping deployment"
+          else
+            echo "needs_deploy=true" >> $GITHUB_OUTPUT
+            echo "🚀 Manifest hash changed - deployment needed"
+            echo "   Old: ${{ steps.deployed.outputs.deployed_hash }}"
+            echo "   New: ${{ steps.new.outputs.manifest_hash }}"
+          fi
+
+      - name: Decrypt SOPS secrets
+        if: steps.check.outputs.needs_deploy == 'true'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export SOPS_AGE_KEY_FILE=/home/runner/.age/key.txt
+
+          # Find and decrypt any SOPS-encrypted files in the checked out repo
+          find k8s/clusters/phx -name "*.sops.yaml" -exec sops -d -i {} \; || true
+
+      - name: Deploy to cluster
+        if: steps.check.outputs.needs_deploy == 'true'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-phx
+
+          echo "Applying manifests to PHX cluster..."
+          kubectl apply -f artifacts/phx-cluster.yaml
+
+          # Also apply any SOPS-decrypted secrets from kustomize
+          kubectl apply -k k8s/clusters/phx/infrastructure-config || true
+          kubectl apply -k k8s/clusters/phx/apps || true
+
+      - name: Update deployment state
+        if: steps.check.outputs.needs_deploy == 'true'
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KUBECONFIG=/home/runner/.kube/config-phx
+
+          # Create/update ConfigMap with deployment state
+          kubectl create configmap deployment-state \
+            -n kube-system \
+            --from-literal=phx-manifest-hash=${{ steps.new.outputs.manifest_hash }} \
+            --from-literal=phx-deployed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --from-literal=phx-git-sha=${{ github.sha }} \
+            --from-literal=phx-git-ref=${{ inputs.ref }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "✅ Updated deployment state in cluster"
+
+      - name: Record GitHub deployment
+        if: steps.check.outputs.needs_deploy == 'true'
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: phx
+          ref: ${{ inputs.ref }}
+          payload: |
+            {
+              "manifest_hash": "${{ steps.new.outputs.manifest_hash }}",
+              "git_sha": "${{ github.sha }}",
+              "deployed_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            }
+
+      - name: Deployment skipped
+        if: steps.check.outputs.needs_deploy == 'false'
+        run: echo "::notice::Deployment skipped - manifest unchanged"
