@@ -8,14 +8,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  validate:
-    name: Validate Manifests
-    uses: ./.github/workflows/k8s-validate.yml
+  # Validation runs separately via k8s-validate.yml workflow
+  # This workflow depends on validation passing via branch protection rules
 
   setup:
     name: Setup Tools
     runs-on: [self-hosted, phx]
-    needs: validate
     steps:
       - name: Cache tools
         uses: actions/cache@v4
