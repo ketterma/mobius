@@ -84,8 +84,19 @@ jobs:
 
           echo "Found integrate run: $LATEST_RUN"
 
+          # Get the exact artifact name (includes manifest hash)
+          ARTIFACT_NAME=$(gh api repos/${{ github.repository }}/actions/runs/$LATEST_RUN/artifacts \
+            --jq '.artifacts[] | select(.name | startswith("lab-cluster-")) | .name')
+
+          if [ -z "$ARTIFACT_NAME" ]; then
+            echo "::error::No lab-cluster artifact found in run $LATEST_RUN"
+            exit 1
+          fi
+
+          echo "Downloading artifact: $ARTIFACT_NAME"
+
           # Download artifacts from that run
-          gh run download $LATEST_RUN --name 'lab-cluster-*' --dir artifacts/
+          gh run download $LATEST_RUN --name "$ARTIFACT_NAME" --dir artifacts/
 
       - name: Get deployed manifest hash
         id: deployed
@@ -242,8 +253,19 @@ jobs:
 
           echo "Found integrate run: $LATEST_RUN"
 
+          # Get the exact artifact name (includes manifest hash)
+          ARTIFACT_NAME=$(gh api repos/${{ github.repository }}/actions/runs/$LATEST_RUN/artifacts \
+            --jq '.artifacts[] | select(.name | startswith("phx-cluster-")) | .name')
+
+          if [ -z "$ARTIFACT_NAME" ]; then
+            echo "::error::No phx-cluster artifact found in run $LATEST_RUN"
+            exit 1
+          fi
+
+          echo "Downloading artifact: $ARTIFACT_NAME"
+
           # Download artifacts from that run
-          gh run download $LATEST_RUN --name 'phx-cluster-*' --dir artifacts/
+          gh run download $LATEST_RUN --name "$ARTIFACT_NAME" --dir artifacts/
 
       - name: Get deployed manifest hash
         id: deployed
